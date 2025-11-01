@@ -325,6 +325,7 @@ function ProductCard({ product }: { product: Product }) {
   )
 }
 
+
 // Product Skeleton for loading state
 function ProductSkeleton() {
   return (

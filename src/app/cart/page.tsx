@@ -280,7 +280,7 @@ export default function CartPage() {
 
         {filteredCartItems.length === 0 && cartItems.length > 0 && searchTerm !== "" ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-            <p className="text-xl font-medium mb-2">No results found for "{searchTerm}"</p>
+            <p className="text-xl font-medium mb-2">No results found for {searchTerm}</p>
             <p className="text-md mb-6">Try a different search term or clear the search bar.</p>
             <Button onClick={() => setSearchTerm("")}>Clear Search</Button>
           </div>

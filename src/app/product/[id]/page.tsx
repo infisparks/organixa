@@ -1,8 +1,15 @@
 import ProductDetails from "./ProductDetails"
 import { notFound } from "next/navigation"
-import { supabase } from "../../../lib/supabase" // Supabase import
-import Header from "@/components/Header" // Corrected import path for Header
-import Footer from "@/components/Footer" // Import Footer
+import { supabase } from "../../../lib/supabase"
+import Header from "@/components/Header"
+import Footer from "@/components/Footer"
+
+// 🎯 FIX: Define the required props interface for dynamic routes
+interface ProductPageProps {
+  params: {
+    id: string
+  }
+}
 
 // Generate static params by fetching all approved product IDs from Supabase
 export async function generateStaticParams() {
@@ -16,7 +23,8 @@ export async function generateStaticParams() {
   return data.map((product) => ({ id: product.id.toString() }))
 }
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
+// ✅ UPDATED: Used the correct ProductPageProps interface
+export default async function ProductPage({ params }: ProductPageProps) {
   // Fetch product details from Supabase, including company information
   const { data: productFound, error } = await supabase
     .from("products")
