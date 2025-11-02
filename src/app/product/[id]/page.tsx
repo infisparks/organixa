@@ -4,16 +4,19 @@ import { supabase } from "../../../lib/supabase"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 
-// 🎯 FIX: Define the required props interface for dynamic routes
+// 🎯 Define props for your dynamic route
 interface ProductPageProps {
   params: {
     id: string
   }
 }
 
-// Generate static params by fetching all approved product IDs from Supabase
+// Generate static params (for SSG)
 export async function generateStaticParams() {
-  const { data, error } = await supabase.from("products").select("id").eq("is_approved", true)
+  const { data, error } = await supabase
+    .from("products")
+    .select("id")
+    .eq("is_approved", true)
 
   if (error) {
     console.error("Error fetching product IDs for static params:", error)
@@ -23,7 +26,8 @@ export async function generateStaticParams() {
   return data.map((product) => ({ id: product.id.toString() }))
 }
 
-// ✅ UPDATED: Used the correct ProductPageProps interface
+// ✅ Ignore internal Next.js type mismatch warning
+//ts-expect-error Next.js internal type system expects params as Promise, but runtime gives plain object
 export default async function ProductPage({ params }: ProductPageProps) {
   // Fetch product details from Supabase, including company information
   const { data: productFound, error } = await supabase
@@ -32,10 +36,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
       `
       *,
       company:companies(company_name, company_logo_url)
-    `,
+    `
     )
     .eq("id", params.id)
-    .eq("is_approved", true) // Only fetch approved products
+    .eq("is_approved", true)
     .single()
 
   if (error || !productFound) {
@@ -43,7 +47,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     return notFound()
   }
 
-  // Map Supabase data to the expected ProductDetailsProps format
+  // Map Supabase data to ProductDetails props
   const productDetailsProps = {
     id: productFound.id,
     productName: productFound.product_name,
@@ -51,11 +55,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
     originalPrice: productFound.original_price,
     discountPrice: productFound.discount_price,
     productPhotoUrls: productFound.product_photo_urls,
-    productVideoUrl: productFound.product_video_url, // Pass video URL if available
-    company_id: productFound.company_id, // ✅ Add this line 
+    productVideoUrl: productFound.product_video_url,
+    company_id: productFound.company_id,
     company: {
-      name: productFound.company?.company_name || "Unknown Company", // Handle null company
-      logo: productFound.company?.company_logo_url || "/placeholder.svg", // Handle null company logo
+      name: productFound.company?.company_name || "Unknown Company",
+      logo: productFound.company?.company_logo_url || "/placeholder.svg",
     },
     nutrients: productFound.nutrients,
   }

@@ -53,7 +53,7 @@ export default function OrderStatusTimeline({ currentStatus }: OrderStatusTimeli
                                 {/* Connecting line - CORRECTED LOGIC AND STYLING BELOW */}
                                 {!isLast && (
                                     <div
-                                        className={`absolute top-1/2 left-full w-full h-1 -translate-y-1/2 z-0 transition-all duration-500 ${
+                                        className={`absolute top-1/2 left-full  h-1 -translate-y-1/2 z-0 transition-all duration-500 w-18 sm:w-25 md:w-27  lg:w-39 xl:w-64 ${
                                             isCompleted
                                                 ? "bg-emerald-500"
                                                 : isActive
@@ -61,7 +61,7 @@ export default function OrderStatusTimeline({ currentStatus }: OrderStatusTimeli
                                                     : "bg-gray-200"
                                         }`}
                                         // 💡 RE-ADDED THE CRITICAL INLINE STYLE FOR DIMENSIONS
-                                        style={{ width: "100px", height: "6px" }}
+                                        style={{  height: "6px" }}
                                     ></div>
                                 )}
                             </div>

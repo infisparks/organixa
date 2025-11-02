@@ -499,7 +499,7 @@ export default function CompanyMyOrdersPage() {
                                                                 {/* Connecting line */}
                                                                 {!isLast && (
                                                                     <div
-                                                                        className={`absolute top-1/2 left-full h-[6px] -translate-y-1/2 z-0 w-full md:w-[100px] sm:w-[100px] xl:w-[200px] ${ 
+                                                                        className={`absolute top-1/2 left-full h-[6px] -translate-y-1/2 z-0 w-18 sm:w-25 md:w-27  lg:w-31 xl:w-48 ${ 
                                                                             isCompleted
                                                                                 ? "bg-green-400"
                                                                                 : isActive
@@ -576,7 +576,7 @@ export default function CompanyMyOrdersPage() {
                                                     </div>
                                                 ))
                                             )}
-                                            <div className="flex justify-end pt-4">
+                                            {/* <div className="flex justify-end pt-4">
                                                 {order.resolved_order_items && order.resolved_order_items.length > 0 && (
                                                     <Button
                                                         asChild
@@ -588,7 +588,7 @@ export default function CompanyMyOrdersPage() {
                                                         </Link>
                                                     </Button>
                                                 )}
-                                            </div>
+                                            </div> */}
                                         </div>
                                     </CardContent>
                                 </Card>

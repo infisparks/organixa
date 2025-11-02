@@ -278,18 +278,20 @@ export default function FavoritesPage() {
             {filteredFavorites.map((item) => (
               <Card
                 key={item.id}
-                className="flex flex-col h-full group hover:shadow-lg transition-shadow"
+                // remove Card internal padding, force rounding on whole card and clip overflow
+                className="flex flex-col h-full group hover:shadow-lg transition-shadow overflow-hidden rounded-lg p-0"
               >
+                {/* image wrapper — no top padding so it sits flush to card top */}
                 <Link
                   href={`/product/${item.productId}`}
-                  className="relative w-full aspect-[3/3] overflow-hidden rounded-t-lg"
+                  className="relative w-full aspect-square overflow-hidden bg-gray-100 block"
                 >
                   <Image
                     src={item.thumbnail || "/placeholder.svg"}
                     alt={item.productName}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                    className="object-cover group-hover:scale-105  transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </Link>
 
