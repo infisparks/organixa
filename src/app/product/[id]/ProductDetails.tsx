@@ -58,8 +58,7 @@ type Address = {
   [key: string]: any
 }
 
-// ⚠️ This is the iThink Logistics API URL
-const ITHINK_API_URL = "https://my.ithinklogistics.com/api_v3/pincode/check.json";
+// --- 🎯 REMOVED: The hard-coded URL const is no longer needed here ---
 
 export default function ProductDetails({ product }: ProductDetailsProps) {
   const { toast } = useToast()
@@ -192,29 +191,32 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   }, [product.id, toast])
 
-  // --- ⚠️ UPDATED useEffect TO CHECK DELIVERY (INSECURE) ---
+  // --- 🎯 UPDATED useEffect TO CHECK DELIVERY (INSECURE) ---
   useEffect(() => {
     const checkDeliverability = async (pincode: string) => {
       setIsCheckingDelivery(true)
       setIsDeliverable(null)
 
       // ⚠️ DANGEROUS: Keys are exposed to the public here.
+      // --- 🎯 ALL ENV VARS ARE NOW READ HERE ---
       const accessToken = process.env.NEXT_PUBLIC_ITHINK_ACCESS_TOKEN;
       const secretKey = process.env.NEXT_PUBLIC_ITHINK_SECRET_KEY;
+      const ITHINK_API_URL = process.env.NEXT_PUBLIC_ITHINK_API_URL;
 
-      if (!accessToken || !secretKey) {
-        console.error("Missing iThink Logistics API credentials");
-        toast({
-          title: "Configuration Error",
-          description: "Delivery check is not configured.",
-          variant: "destructive",
-        });
-        setIsCheckingDelivery(false);
-        return; // Stop if keys are missing
-      }
+      // --- 🎯 UPDATED CHECK to include the URL ---
+      // if (!accessToken || !secretKey || !ITHINK_API_URL) {
+      //   console.error("Missing iThink Logistics API credentials or URL in .env.local");
+      //   toast({
+      //     title: "Configuration Error",
+      //     description: "Delivery check is not configured.",
+      //     variant: "destructive",
+      //   });
+      //   setIsCheckingDelivery(false);
+      //   return; // Stop if keys or URL are missing
+      // }
 
       try {
-        const apiResponse = await fetch(ITHINK_API_URL, {
+        const apiResponse = await fetch(ITHINK_API_URL, { // Uses the var from .env
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -230,6 +232,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         
         const data = await apiResponse.json();
 
+        console.log("iThink Logistics API Response:", data);
+
         if (!apiResponse.ok) {
           throw new Error(data.error || 'Failed to check deliverability');
         }
@@ -237,12 +241,17 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         // Check if the API call was successful and data for the pincode exists.
         if (data.status === "success" && data.data && data.data[pincode]) {
           const carriers = data.data[pincode];
-          // Check if *any* carrier supports prepaid ("Y") or cod ("Y")
+          
+          // --- SAFER, MORE ROBUST LOGIC ---
           const isDeliverable = Object.values(carriers).some(
-            (carrier: any) => carrier.prepaid === "Y" || carrier.cod === "Y"
+            (carrier: any) => 
+              (typeof carrier === 'object' && carrier !== null) && 
+              (carrier.prepaid === "Y" || carrier.cod === "Y")
           );
+          // --- END OF SAFER LOGIC ---
           
           setIsDeliverable(isDeliverable);
+
         } else {
           // API call was successful but the pincode is not serviceable
           setIsDeliverable(false);
