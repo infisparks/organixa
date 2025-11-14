@@ -5,8 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast"; // Assuming you have this
-import type { UserProfile } from "./ClientLayoutWrapper";
+import { useToast } from "@/hooks/use-toast";
+import type { UserProfile, Address } from "./ClientLayoutWrapper"; // Assuming Address is exported or defined here
 
 import {
   Dialog,
@@ -26,9 +26,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { Separator } from "@/components/ui/separator"; // Added for visual separation
+import { Separator } from "@/components/ui/separator";
 
-// This schema validates ALL form fields, including the new profileName
+// Schema is unchanged
 const addressFormSchema = z.object({
   profileName: z.string().min(1, "Your name is required"),
   addressName: z.string().min(1, "Address name is required (e.g., Home, Work)"),
@@ -57,30 +57,17 @@ export default function AddressFormModal({
   onAddressUpdated,
 }: AddressFormModalProps) {
   const [loading, setLoading] = useState(false);
+  // --- NEW ---
+  // Keep track of the address ID we are editing, if any
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressFormSchema),
+    // Default values will be set by the useEffect hook
     defaultValues: {
-      profileName: userProfile.name || "", // Pre-fill name if it exists
-      addressName: "",
-      houseNumber: "",
-      street: "",
-      area: "",
-      city: "",
-      state: "",
-      country: "India", // Default to India
-      pincode: "",
-      primaryPhone: userProfile.phone || "", // Pre-fill phone if it exists
-      secondaryPhone: "",
-    },
-  });
-
-  // This ensures the form resets to the user's current profile data
-  // if the modal closes and reopens (e.g., during a session change)
-  useEffect(() => {
-    form.reset({
       profileName: userProfile.name || "",
+      primaryPhone: userProfile.phone || "",
       addressName: "",
       houseNumber: "",
       street: "",
@@ -89,46 +76,111 @@ export default function AddressFormModal({
       state: "",
       country: "India",
       pincode: "",
-      primaryPhone: userProfile.phone || "",
       secondaryPhone: "",
-    });
-  }, [userProfile, form]);
+    },
+  });
 
+  // --- UPDATED useEffect ---
+  // This now pre-fills the form with existing data if it's found
+  useEffect(() => {
+    // Find an existing address to edit. Prioritize the default one.
+    const existingAddresses = userProfile.addresses || [];
+    const addressToEdit = 
+      existingAddresses.find(addr => addr.isDefault) || 
+      (existingAddresses.length > 0 ? existingAddresses[0] : null);
+
+    let defaultFormValues = {
+      profileName: userProfile.name || "",
+      primaryPhone: userProfile.phone || "",
+      // Default blank address
+      addressName: "",
+      houseNumber: "",
+      street: "",
+      area: "",
+      city: "",
+      state: "",
+      country: "India",
+      pincode: "",
+      secondaryPhone: "",
+    };
+
+    if (addressToEdit) {
+      // If we found an address, fill the form with its data
+      setEditingAddressId(addressToEdit.id); // Mark this ID for an update
+      defaultFormValues = {
+        ...defaultFormValues,
+        addressName: addressToEdit.name || "", // 'name' on Address is 'addressName' in form
+        houseNumber: addressToEdit.houseNumber || "",
+        street: addressToEdit.street || "",
+        area: addressToEdit.area || "",
+        city: addressToEdit.city || "",
+        state: addressToEdit.state || "",
+        country: addressToEdit.country || "India",
+        pincode: addressToEdit.pincode || "",
+        secondaryPhone: addressToEdit.secondaryPhone || "",
+        // Ensure phone is also pre-filled from address if profile one is missing
+        primaryPhone: userProfile.phone || addressToEdit.primaryPhone || "",
+      };
+    } else {
+      // No address found, so we're creating a new one
+      setEditingAddressId(null);
+    }
+    
+    form.reset(defaultFormValues);
+    
+  }, [userProfile, form, isOpen]); // Rerun when modal opens or profile changes
+
+  // --- UPDATED onSubmit ---
+  // This now handles both UPDATE and CREATE
   async function onSubmit(values: AddressFormValues) {
     setLoading(true);
     try {
-      // 1. Destructure the values to separate profile name from address details
       const { profileName, ...addressValues } = values;
-
-      // 2. Create the new address object
-      const newAddress = {
-        id: crypto.randomUUID(),
-        isDefault: true, // Make this new address the default one
-        ...addressValues, // Spread the rest of the address fields
-      };
-
-      // 3. Get the user's current addresses
+      
       const currentAddresses = userProfile.addresses || [];
+      let updatedAddresses;
+
+      if (editingAddressId) {
+        // --- UPDATE LOGIC ---
+        // We are updating an existing address
+        updatedAddresses = currentAddresses.map(addr => {
+          if (addr.id === editingAddressId) {
+            // This is the one we're editing
+            return {
+              ...addr, // Keep its original ID
+              ...addressValues, // Apply all form values
+              name: addressValues.addressName, // Map form name back to address name
+              isDefault: true, // Ensure it's the default
+            };
+          }
+          // Set all other addresses to not be default
+          return { ...addr, isDefault: false };
+        });
+      } else {
+        // --- CREATE LOGIC ---
+        // We are adding a new address
+        const newAddress = {
+          id: crypto.randomUUID(),
+          isDefault: true,
+          ...addressValues,
+          name: addressValues.addressName, // Map form name back to address name
+        };
+        updatedAddresses = [
+          ...currentAddresses.map(addr => ({ ...addr, isDefault: false })),
+          newAddress,
+        ];
+      }
       
-      // 4. Create the new addresses array
-      // This maps over old addresses, sets them to NOT default,
-      // and adds the new one as the default.
-      const updatedAddresses = [
-        ...currentAddresses.map(addr => ({ ...addr, isDefault: false })),
-        newAddress,
-      ];
-      
-      // 5. Update the user_profiles table
+      // 5. Update the user_profiles table (this part is the same)
       const { data, error } = await supabase
         .from('user_profiles')
         .update({
-          name: profileName, // <-- SAVES THE USER'S NAME
+          name: profileName,
           addresses: updatedAddresses,
-          // Also update the main 'phone' if it's missing or changed
-          phone: values.primaryPhone,
+          phone: values.primaryPhone, // Update the main profile phone
         })
         .eq('id', userProfile.id)
-        .select() // Ask Supabase to return the updated row
+        .select()
         .single();
       
       if (error) throw error;
@@ -136,10 +188,9 @@ export default function AddressFormModal({
       if (data) {
         toast({
           title: "Profile Saved!",
-          description: "Your name and address have been updated.",
-          variant: "default", // Use "default" or "success"
+          description: "Your profile and address have been updated.",
+          variant: "default",
         });
-        // 6. Pass the fully updated profile back to the layout wrapper
         onAddressUpdated(data as UserProfile);
       }
       
@@ -156,7 +207,6 @@ export default function AddressFormModal({
   }
 
   return (
-    // 'open' controls the modal. 'onOpenChange' is empty to prevent closing
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
@@ -169,7 +219,6 @@ export default function AddressFormModal({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             
-            {/* --- Profile Name Field --- */}
             <FormField
               control={form.control}
               name="profileName"
@@ -186,7 +235,6 @@ export default function AddressFormModal({
 
             <Separator className="my-6" />
 
-            {/* --- Address Fields --- */}
             <FormField
               control={form.control}
               name="addressName"
@@ -295,7 +343,6 @@ export default function AddressFormModal({
                     <FormLabel>Country</FormLabel>
                     <FormControl>
                       <Input placeholder="India" {...field} />
-Next.js
                     </FormControl>
                     <FormMessage />
                   </FormItem>

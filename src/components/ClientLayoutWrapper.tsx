@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useEffect, ReactNode } from 'react';
-import { usePathname } from 'next/navigation'; // Import usePathname
-import { supabase } from '@/lib/supabase'; // Adjust path if needed
+import { usePathname } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
-import AddressFormModal from './AddressFormModal'; // The modal component
+import AddressFormModal from './AddressFormModal';
 import { Loader2 } from 'lucide-react';
 
-// Define the types based on your SQL data
-type Address = {
+// --- FIX IS HERE ---
+// Added 'export' so other files can import this type
+export type Address = {
   id: string;
   area: string;
   city: string;
@@ -39,7 +40,6 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // Get the current URL path
   const pathname = usePathname();
 
   useEffect(() => {
@@ -50,11 +50,10 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
       if (session?.user) {
         setUser(session.user);
         
-        // Fetch the user's profile from the public.user_profiles table
         const { data: userProfile, error } = await supabase
           .from('user_profiles')
-          .select('*') // Select all columns
-          .eq('id', session.user.id) // Match the user's auth ID
+          .select('*')
+          .eq('id', session.user.id)
           .single();
 
         if (error) {
@@ -62,21 +61,20 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
         }
 
         if (userProfile) {
-          setProfile(userProfile as UserProfile);
+          const typedProfile = userProfile as UserProfile;
+          setProfile(typedProfile);
           
-          // Check the address condition
-          const addresses = userProfile.addresses || [];
+          const hasName = typedProfile.name && typedProfile.name.trim() !== '';
+          const hasPhone = typedProfile.phone && typedProfile.phone.trim() !== '';
+          const addresses = typedProfile.addresses || [];
           const hasAddressWithPincode = addresses.some(
             (addr: Address) => addr.pincode && addr.pincode.trim() !== ''
           );
           
-          // **UPDATED LOGIC**
-          // Check if the current path starts with /company/
           const isCompanyRoute = pathname.startsWith('/company/');
+          const needsProfileCompletion = !hasName || !hasPhone || !hasAddressWithPincode;
           
-          // If they have NO address AND it's NOT a company route,
-          // then open the modal.
-          if (!hasAddressWithPincode && !isCompanyRoute) {
+          if (needsProfileCompletion && !isCompanyRoute) {
             setIsModalOpen(true);
           }
         }
@@ -84,18 +82,14 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
       setLoading(false);
     };
 
-    // Run the check on initial load
     checkUserAndProfile();
 
-    // Listen for auth changes (login/logout)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN') {
-          // If user logs in, re-run the check
           checkUserAndProfile();
         }
         if (event === 'SIGNED_OUT') {
-          // If user logs out, clear state
           setUser(null);
           setProfile(null);
           setIsModalOpen(false);
@@ -104,31 +98,24 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
     );
 
     return () => {
-      // Clean up the listener on unmount
       authListener.subscription.unsubscribe();
     };
-  }, [pathname]); // Add pathname to the dependency array
+  }, [pathname]);
 
-  /**
-   * This function is passed to the modal.
-   * When the address is successfully updated, the modal calls this
-   * function to update the layout's state and close the modal.
-   */
   const handleAddressUpdated = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
     
-    // Re-check the address condition (it should be valid now)
+    const hasName = updatedProfile.name && updatedProfile.name.trim() !== '';
+    const hasPhone = updatedProfile.phone && updatedProfile.phone.trim() !== '';
     const addresses = updatedProfile.addresses || [];
     const hasAddressWithPincode = addresses.some(
       (addr: Address) => addr.pincode && addr.pincode.trim() !== ''
     );
     
-    // This will set isModalOpen to false, closing the modal
-    setIsModalOpen(!hasAddressWithPincode);
+    const needsProfileCompletion = !hasName || !hasPhone || !hasAddressWithPincode;
+    setIsModalOpen(needsProfileCompletion);
   };
 
-  // While checking the session, show a full-page loader
-  // to prevent layout flashes.
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -140,10 +127,6 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
   return (
     <>
       {children}
-      
-      {/* If the modal is open AND we have a profile, render the modal.
-        We pass the profile and the update function as props.
-      */}
       {profile && (
         <AddressFormModal
           isOpen={isModalOpen}

@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
+// ... (ProductDetailsProps and Address types remain the same)
 type ProductDetailsProps = {
   product: {
     id: string
@@ -50,10 +51,20 @@ type ProductDetailsProps = {
   }
 }
 
+type Address = {
+  id: string,
+  pincode: string,
+  isDefault: boolean,
+  [key: string]: any
+}
+
+// ⚠️ This is the iThink Logistics API URL
+const ITHINK_API_URL = "https://my.ithinklogistics.com/api_v3/pincode/check.json";
+
 export default function ProductDetails({ product }: ProductDetailsProps) {
   const { toast } = useToast()
   const router = useRouter()
-  // 🎯 INITIALIZE QUANTITY TO 1, WILL BE OVERWRITTEN BY CART VALUE
+  // ... (All other state variables are the same)
   const [quantity, setQuantity] = useState(1)
   const [showAuthPopup, setShowAuthPopup] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -66,12 +77,16 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const [hasReviewed, setHasReviewed] = useState(false)
   const [reviews, setReviews] = useState<{ user_id: string; rating: number; comment: string; created_at: string }[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  
+  const [userPincode, setUserPincode] = useState<string | null>(null)
+  const [isDeliverable, setIsDeliverable] = useState<boolean | null>(null)
+  const [isCheckingDelivery, setIsCheckingDelivery] = useState(false)
 
   const displayPrice = product.discountPrice ?? product.originalPrice
   const [selectedImage, setSelectedImage] = useState(product.productPhotoUrls?.[0] ?? "")
   const images = product.productPhotoUrls ?? []
 
-  // ✅ UPDATED: Fetch current user, cart, favorite, and **cart quantity** status
+  // ... (The first useEffect for fetchUserData is identical, no changes)
   useEffect(() => {
     const fetchUserData = async () => {
       const {
@@ -81,26 +96,20 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       setCurrentUserId(userId)
 
       if (userId) {
-        // Check if product is in cart AND fetch the quantity
+        // Check cart
         const { data: cartData, error: cartError } = await supabase
           .from("cart_items")
-          .select("id, quantity") // 👈 Fetch quantity here
+          .select("id, quantity")
           .eq("user_id", userId)
           .eq("product_id", product.id)
           .single()
           
         setInCart(!!cartData)
-        
-        // 🎯 Set the quantity state based on the cart item
-        if (cartData) {
-            setQuantity(cartData.quantity)
-        } else {
-            setQuantity(1) // Reset quantity to 1 if not in cart
-        }
-
+        if (cartData) setQuantity(cartData.quantity)
+        else setQuantity(1)
         if (cartError && cartError.code !== "PGRST116") console.error("Error checking cart status:", cartError)
 
-        // Check if product is favorite
+        // Check favorite
         const { data: favData, error: favError } = await supabase
           .from("favorites")
           .select("id")
@@ -110,7 +119,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         setIsFavorite(!!favData)
         if (favError && favError.code !== "PGRST116") console.error("Error checking favorite status:", favError)
 
-        // Check if user has reviewed this product
+        // Check review
         const { data: reviewData, error: reviewError } = await supabase
           .from("reviews")
           .select("id")
@@ -119,94 +128,160 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           .single()
         setHasReviewed(!!reviewData)
         if (reviewError && reviewError.code !== "PGRST116") console.error("Error checking review status:", reviewError)
+        
+        // Fetch Pincode
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('addresses')
+          .eq('id', userId)
+          .single()
+
+        if (profileError && profileError.code !== 'PGRST116') {
+            console.error("Error fetching user profile:", profileError)
+        }
+
+        if (profileData && profileData.addresses) {
+            const addresses = profileData.addresses as Address[]
+            const defaultAddress = addresses.find(addr => addr.isDefault) || (addresses.length > 0 ? addresses[0] : null)
+            
+            if (defaultAddress && defaultAddress.pincode) {
+                setUserPincode(defaultAddress.pincode.trim())
+            } else {
+                setUserPincode(null)
+            }
+        } else {
+            setUserPincode(null)
+        }
+
       } else {
-        // Reset states if no user is logged in
+        // Reset states if no user
         setInCart(false)
         setIsFavorite(false)
         setHasReviewed(false)
-        setQuantity(1) // Reset quantity to 1
+        setQuantity(1)
+        setUserPincode(null)
+        setIsDeliverable(null)
+        setIsCheckingDelivery(false)
       }
     }
 
     fetchUserData()
 
-    // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setCurrentUserId(session?.user?.id || null)
-      fetchUserData() // Re-fetch all user-related data on auth change
+      fetchUserData()
     })
 
-    // Listen for real-time changes to the cart item specifically for this product
     const cartItemChannel = supabase.channel(`cart_item_${product.id}`).on(
       'postgres_changes',
       { 
         event: '*', 
         schema: 'public', 
         table: 'cart_items',
-        filter: `product_id=eq.${product.id}` // Only listen for changes to this product
+        filter: `product_id=eq.${product.id}`
       },
       (payload) => {
-        // Only re-fetch if the change applies to the current user's item (optimisation)
-        // Since we can't filter by user_id in the subscription payload reliably here, 
-        // we'll just re-fetch the user data which includes cart status.
-        fetchUserData(); 
+        fetchUserData()
       }
-    ).subscribe();
+    ).subscribe()
 
 
     return () => {
       authListener.subscription.unsubscribe()
-      supabase.removeChannel(cartItemChannel); // Clean up the cart listener
+      supabase.removeChannel(cartItemChannel)
     }
-  }, [product.id, toast]) // Added toast dependency
+  }, [product.id, toast])
 
-  // Subscribe to all reviews for this product. (No changes needed here)
+  // --- ⚠️ UPDATED useEffect TO CHECK DELIVERY (INSECURE) ---
   useEffect(() => {
-    const fetchReviews = async () => {
-      const { data, error } = await supabase
-        .from("reviews")
-        .select("user_id, rating, comment, created_at")
-        .eq("product_id", product.id)
-        .order("created_at", { ascending: false })
+    const checkDeliverability = async (pincode: string) => {
+      setIsCheckingDelivery(true)
+      setIsDeliverable(null)
 
-      if (error) {
-        console.error("Error fetching reviews:", error)
-        setReviews([])
-        return
+      // ⚠️ DANGEROUS: Keys are exposed to the public here.
+      const accessToken = process.env.NEXT_PUBLIC_ITHINK_ACCESS_TOKEN;
+      const secretKey = process.env.NEXT_PUBLIC_ITHINK_SECRET_KEY;
+
+      if (!accessToken || !secretKey) {
+        console.error("Missing iThink Logistics API credentials");
+        toast({
+          title: "Configuration Error",
+          description: "Delivery check is not configured.",
+          variant: "destructive",
+        });
+        setIsCheckingDelivery(false);
+        return; // Stop if keys are missing
       }
-      setReviews(data || [])
+
+      try {
+        const apiResponse = await fetch(ITHINK_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            data: {
+              pincode: pincode,
+              access_token: accessToken,
+              secret_key: secretKey,
+            },
+          }),
+        });
+        
+        const data = await apiResponse.json();
+
+        if (!apiResponse.ok) {
+          throw new Error(data.error || 'Failed to check deliverability');
+        }
+
+        // Check if the API call was successful and data for the pincode exists.
+        if (data.status === "success" && data.data && data.data[pincode]) {
+          const carriers = data.data[pincode];
+          // Check if *any* carrier supports prepaid ("Y") or cod ("Y")
+          const isDeliverable = Object.values(carriers).some(
+            (carrier: any) => carrier.prepaid === "Y" || carrier.cod === "Y"
+          );
+          
+          setIsDeliverable(isDeliverable);
+        } else {
+          // API call was successful but the pincode is not serviceable
+          setIsDeliverable(false);
+        }
+
+      } catch (error: any) {
+        console.error("Error checking delivery:", error);
+        setIsDeliverable(false); // Assume not deliverable on error
+        toast({
+          title: "Delivery Check Failed",
+          description: error.message || "Could not check your pincode.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsCheckingDelivery(false);
+      }
+    };
+
+    // Only run the check if we have a user and a pincode
+    if (userPincode && currentUserId) {
+      checkDeliverability(userPincode);
+    }
+    // If user is logged in but has no pincode, set to null
+    if(currentUserId && !userPincode) {
+      setIsDeliverable(null);
     }
 
-    fetchReviews()
+  }, [userPincode, currentUserId, toast])
+  // --- END OF UPDATED SECTION ---
 
-    const channel = supabase
-      .channel(`reviews_for_product_${product.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "reviews",
-          filter: `product_id=eq.${product.id}`,
-        },
-        (payload) => {
-          // Re-fetch reviews on any change to ensure data consistency
-          fetchReviews()
-        },
-      )
-      .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [product.id])
+  // ... (fetchReviews, toggleFavorite, handleAddToCart, handleRemoveFromCart, 
+  //      handleDirectBuy, handleAuthSuccess, updateQuantity, handleReviewSubmit, 
+  //      handleOrderSuccess... ALL THESE FUNCTIONS ARE UNCHANGED) ...
 
-  // Calculate aggregated rating.
   const reviewCount = reviews.length
   const averageRating =
     reviewCount > 0 ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount).toFixed(1) : null
 
-  // Toggle favorite status. (No changes needed here)
   const toggleFavorite = async () => {
     if (!currentUserId) {
       setShowAuthPopup(true)
@@ -250,7 +325,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   }
 
-  // Add-to-cart functionality. (Updated to use current quantity state)
   const handleAddToCart = async () => {
     if (!currentUserId) {
       setShowAuthPopup(true)
@@ -258,7 +332,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
 
     try {
-      // Check for existing cart item (just for a proper toast, if inCart is true, this button shouldn't show)
       const { data: existingCartItem, error: fetchError } = await supabase
         .from("cart_items")
         .select("id")
@@ -279,7 +352,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         return
       }
 
-      // 🎯 Insert the current quantity from state
       const { error } = await supabase.from("cart_items").insert({
         user_id: currentUserId,
         product_id: product.id,
@@ -304,7 +376,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   }
 
-  // Remove-from-cart functionality. (No changes needed here)
   const handleRemoveFromCart = async () => {
     if (!currentUserId) {
       setShowAuthPopup(true)
@@ -319,7 +390,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         .eq("product_id", product.id)
       if (error) throw error
       setInCart(false)
-      setQuantity(1) // Reset quantity to 1 after removal
+      setQuantity(1)
       toast({
         title: "Removed from cart",
         description: `${product.productName} removed from your cart.`,
@@ -335,7 +406,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   }
 
-  // Direct buy functionality. (No changes needed here)
   const handleDirectBuy = () => {
     if (!currentUserId) {
       setShowAuthPopup(true)
@@ -344,7 +414,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     setShowCheckoutModal(true)
   }
 
-  // After a successful auth, try adding product to cart. (No changes needed here)
   const handleAuthSuccess = useCallback(() => {
     setShowAuthPopup(false)
     toast({
@@ -354,13 +423,11 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     })
   }, [toast])
 
-  // Update Quantity function (No changes needed here)
   const updateQuantity = (newQuantity: number) => {
     if (newQuantity < 1) return
     setQuantity(newQuantity)
   }
 
-  // Handle review submission. (No changes needed here)
   const handleReviewSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!currentUserId) {
@@ -418,13 +485,62 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   }
 
   const handleOrderSuccess = () => {
-    // For direct buy, no cart to clear, just redirect to orders
     router.push("/orders")
   }
 
+
+  // ... (useEffect for fetchReviews is also unchanged)
+  useEffect(() => {
+    const fetchReviews = async () => {
+      const { data, error } = await supabase
+        .from("reviews")
+        .select("user_id, rating, comment, created_at")
+        .eq("product_id", product.id)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error fetching reviews:", error)
+        setReviews([])
+        return
+      }
+      setReviews(data || [])
+    }
+
+    fetchReviews()
+
+    const channel = supabase
+      .channel(`reviews_for_product_${product.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reviews",
+          filter: `product_id=eq.${product.id}`,
+        },
+        (payload) => {
+          fetchReviews()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [product.id])
+
+  
+  // --- LOGIC FOR DISABLING BUTTONS (Unchanged) ---
+  const isActionDisabled = 
+    (!!currentUserId && isCheckingDelivery) ||
+    (!!currentUserId && !userPincode) ||
+    (!!currentUserId && userPincode && isDeliverable === false);
+
+  // --- JSX (RETURN) ---
+  // This is all identical to the previous version. The new delivery
+  // status UI and the 'disabled' prop on the buttons are already correct.
   return (
     <div className="bg-white">
-      {/* Breadcrumb */}
       <nav className="hidden sm:flex items-center text-sm text-gray-500 px-4 sm:px-6 lg:px-8 ">
         <Link href="/" className="hover:text-gray-900">
           Home
@@ -478,7 +594,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
               {product.productVideoUrl && (
                 <button
                   onClick={() => {
-                    // Handle video preview, e.g., open in a modal
                     window.open(product.productVideoUrl, "_blank")
                   }}
                   className="relative aspect-square rounded-lg overflow-hidden border-2 transition-all border-transparent hover:border-gray-300 flex items-center justify-center bg-gray-100"
@@ -662,6 +777,37 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             </div>
             {/* Add to Cart Section */}
             <div className="mt-8 border-t border-gray-200 pt-8">
+              
+              {/* Delivery Check Status */}
+              <div className="mb-4 h-6">
+                {currentUserId && isCheckingDelivery && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 animate-pulse">
+                    <Clock className="w-4 h-4" />
+                    Checking delivery to your pincode...
+                  </div>
+                )}
+                {currentUserId && !isCheckingDelivery && userPincode && isDeliverable === true && (
+                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
+                    <Check className="w-5 h-5" />
+                    Deliverable to {userPincode}
+                  </div>
+                )}
+                {currentUserId && !isCheckingDelivery && userPincode && isDeliverable === false && (
+                  <div className="flex items-center gap-2 text-sm font-medium text-red-600">
+                    <X className="w-5 h-5" />
+                    Not deliverable to {userPincode}
+                  </div>
+                )}
+                {currentUserId && !isCheckingDelivery && !userPincode && (
+                  <div className="flex items-center gap-2 text-sm font-medium text-yellow-700">
+                    <Truck className="w-5 h-5" />
+                    <Link href="/profile/addresses" className="hover:underline">
+                       Please add an address to check deliverability.
+                    </Link>
+                  </div>
+                )}
+              </div>
+              
               <div className="flex flex-col sm:flex-row gap-4">
                 {/* Quantity Selector */}
                 <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
@@ -692,14 +838,16 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                   ) : (
                     <button
                       onClick={handleAddToCart}
-                      className="flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors"
+                      className="flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isActionDisabled}
                     >
                       <Check className="w-4 h-4" /> Add to Cart
                     </button>
                   )}
                   <button
                     onClick={handleDirectBuy}
-                    className="flex items-center justify-center gap-2 bg-gray-900 text-white py-3 px-4 rounded-lg hover:bg-black transition-colors"
+                    className="flex items-center justify-center gap-2 bg-gray-900 text-white py-3 px-4 rounded-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isActionDisabled}
                   >
                     Buy Now • ₹{(displayPrice * quantity).toFixed(2)}
                   </button>
@@ -725,6 +873,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           </div>
         </div>
       </div>
+
       {/* Auth Popup */}
       {showAuthPopup && (
         <AuthPopup isOpen={showAuthPopup} onClose={() => setShowAuthPopup(false)} onSuccess={handleAuthSuccess} />
@@ -797,6 +946,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         </Dialog>
       )}
 
+      {/* Checkout Modal */}
       {showCheckoutModal && (
         <CheckoutDetailsModal
           isOpen={showCheckoutModal}
