@@ -2,26 +2,22 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react"; // Import useRef
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase"; // Make sure this path is correct
 import { Loader2 } from "lucide-react";
 
 export default function AuthCallback() {
   const router = useRouter();
+  // Add a ref to prevent multiple redirect calls
+  const redirectStarted = useRef(false);
 
   useEffect(() => {
-    // This listener handles the session information from the URL hash
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          // Once signed in, perform the same role check
-          handleRoleRedirect(session.user.id);
-        }
-      }
-    );
-
     const handleRoleRedirect = async (userId: string) => {
+      // Only run this logic once
+      if (redirectStarted.current) return;
+      redirectStarted.current = true; // Set the flag
+
       try {
         // Check if the user ID exists in the 'companies' table
         const { data: companyData, error: companyError } = await supabase
@@ -43,6 +39,25 @@ export default function AuthCallback() {
         router.replace("/");
       }
     };
+
+    // This listener handles the session information from the URL hash
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      
+      // *** THIS IS THE FIX ***
+      // We listen for two events:
+      // 1. SIGNED_IN: Fires when the user actively signs in.
+      // 2. INITIAL_SESSION: Fires when the listener is set up
+      //    AND a session is already present (from the URL hash).
+      if (
+        (event === "SIGNED_IN" || event === "INITIAL_SESSION") &&
+        session
+      ) {
+        // Once signed in, perform the role check
+        handleRoleRedirect(session.user.id);
+      }
+    });
 
     // Unsubscribe from the listener when the component unmounts
     return () => {
