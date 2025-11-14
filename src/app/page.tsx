@@ -1,20 +1,17 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
-import { Heart, Star, ShieldCheck, Filter, Loader2, ArrowRight } from "lucide-react"
+import { Heart, Star, ShieldCheck, Filter, Loader2, ArrowRight, Sparkles, TrendingUp, Tag } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import Footer from "@/components/Footer"
-import Header from "@/components/Header"
-import Slider from "react-slick"
-import "slick-carousel/slick/slick.css"
-import "slick-carousel/slick/slick-theme.css"
+// RESTORING EXTERNAL COMPONENT IMPORTS
+import Header from "@/components/Header" // Assuming Header component is back
+import Footer from "@/components/Footer" // Assuming Footer component is back
 import { supabase } from "@/lib/supabase"
 import AuthPopup from "@/components/auth-popup"
 import { useRouter } from "next/navigation"
@@ -44,58 +41,47 @@ type CategoryProps = {
   onCategoryClick: (category: string) => void
 }
 
-// Category Carousel Component (updated with professional styling)
+// Enhanced Category Carousel with better mobile UX (Scrollable)
 function CategoryCarousel({ categories, selectedCategory, onCategoryClick }: CategoryProps) {
-  const settings = {
-    dots: true,
-    infinite: true,
-    autoplay: true,
-    autoplaySpeed: 4000,
-    speed: 500,
-    slidesToShow: 4,
-    slidesToScroll: 1,
-    responsive: [
-      {
-        breakpoint: 1024,
-        settings: {
-          slidesToShow: 3,
-        },
-      },
-      {
-        breakpoint: 768,
-        settings: {
-          slidesToShow: 2,
-        },
-      },
-      {
-        breakpoint: 640,
-        settings: {
-          slidesToShow: 1,
-        },
-      },
-    ],
-  }
   return (
-    <section className="py-3 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Slider {...settings} className="category-slider">
-          {categories.map((cat) => (
-            <div key={cat.id} className="px-2 cursor-pointer" onClick={() => onCategoryClick(cat.title)}>
-              <Card
-                className={`h-max transition-all duration-300 hover:shadow-md ${
-                  selectedCategory === cat.title ? "ring-2 ring-green-500 shadow-md" : ""
+    <section className="py-4 bg-gradient-to-b from-white to-gray-50/50">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        {/* Scrollable Container */}
+        <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
+          <div className="flex gap-3 pb-2">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => onCategoryClick(cat.title)}
+                className={`flex-shrink-0 transition-all duration-300 ${
+                  selectedCategory === cat.title ? "scale-105" : "hover:scale-102"
                 }`}
               >
-                <CardContent className="p-4 flex items-center">
-                  <div className="w-12 h-12 flex items-center justify-center bg-green-100 rounded-full mr-4 text-2xl">
+                <div
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all whitespace-nowrap ${
+                    selectedCategory === cat.title
+                      ? "border-green-500 bg-green-50 shadow-lg shadow-green-100"
+                      : "border-gray-200 bg-white hover:border-green-300 hover:shadow-md"
+                  }`}
+                >
+                  <div className={`text-2xl sm:text-3xl flex-shrink-0 transition-transform duration-300 ${
+                    selectedCategory === cat.title ? "scale-110" : ""
+                  }`}>
                     {cat.icon}
                   </div>
-                  <h3 className="font-medium text-gray-900">{cat.title}</h3>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
-        </Slider>
+                  <div className="text-left min-w-[120px] sm:min-w-[140px]">
+                    <p className={`font-semibold text-sm sm:text-base leading-tight ${
+                      selectedCategory === cat.title ? "text-green-700" : "text-gray-800"
+                    }`}>
+                      {cat.title.split(" ")[0]}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{cat.subtitle}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -107,24 +93,22 @@ function FavButton({ product }: { product: Product }) {
   const [showAuthPopup, setShowAuthPopup] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   useEffect(() => {
     const checkUserAndFavStatus = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       const currentUserId = session?.user?.id || null
       setUserId(currentUserId)
 
       if (currentUserId) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("favorites")
           .select("id")
           .eq("user_id", currentUserId)
           .eq("product_id", product.id)
           .single()
         setIsFav(!!data)
-        if (error && error.code !== "PGRST116") console.error("Error checking favorite status:", error)
       } else {
         setIsFav(false)
       }
@@ -133,8 +117,7 @@ function FavButton({ product }: { product: Product }) {
 
     checkUserAndFavStatus()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id || null)
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
       checkUserAndFavStatus() // Re-check fav status on auth change
     })
 
@@ -153,23 +136,20 @@ function FavButton({ product }: { product: Product }) {
     }
 
     setIsLoading(true)
+    setIsAnimating(true)
     try {
       if (isFav) {
-        const { error } = await supabase.from("favorites").delete().eq("user_id", userId).eq("product_id", product.id)
-        if (error) throw error
+        await supabase.from("favorites").delete().eq("user_id", userId).eq("product_id", product.id)
         setIsFav(false)
       } else {
-        const { error } = await supabase.from("favorites").insert({
-          user_id: userId,
-          product_id: product.id,
-        })
-        if (error) throw error
+        await supabase.from("favorites").insert({ user_id: userId, product_id: product.id })
         setIsFav(true)
       }
     } catch (error) {
       console.error("Error toggling favorite:", error)
     } finally {
       setIsLoading(false)
+      setTimeout(() => setIsAnimating(false), 600)
     }
   }
 
@@ -178,12 +158,20 @@ function FavButton({ product }: { product: Product }) {
       <button
         onClick={toggleFav}
         disabled={isLoading}
-        className={`absolute top-2 right-2 p-2 rounded-full shadow-sm transition-all duration-300 ${
-          isLoading ? "opacity-50" : "opacity-100"
-        } ${isFav ? "bg-red-500 hover:bg-red-600" : "bg-white/90 hover:bg-white"}`}
+        className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-sm transition-all duration-300 z-10 
+          ${isLoading ? "opacity-50 cursor-not-allowed" : "opacity-100"}
+          ${isFav
+            ? "bg-red-500 hover:bg-red-600 shadow-lg scale-110"
+            : "bg-white/90 hover:bg-white shadow-md hover:scale-110"
+          }
+        `}
         aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
       >
-        <Heart className={`w-4 h-4 ${isFav ? "text-white fill-current" : "text-gray-600"}`} />
+        <Heart
+          className={`w-4 h-4 transition-all duration-300 ${
+            isFav ? "text-white fill-current" : "text-gray-700"
+          } ${isAnimating ? "scale-125" : ""}`}
+        />
       </button>
       <AuthPopup
         isOpen={showAuthPopup}
@@ -194,25 +182,25 @@ function FavButton({ product }: { product: Product }) {
   )
 }
 
-// Product Card Component – updated to fetch and display actual review data
+// Professional Product Card with dynamic review fetching - UPDATED
 function ProductCard({ product }: { product: Product }) {
   const [reviewData, setReviewData] = useState({ count: 0, average: 0 })
 
   useEffect(() => {
     const fetchReviews = async () => {
+      // Assuming 'reviews' table exists and has 'product_id' and 'rating' columns
       const { data, error } = await supabase.from("reviews").select("rating").eq("product_id", product.id)
 
       if (error) {
-        console.error("Error fetching reviews:", error)
         setReviewData({ count: 0, average: 0 })
         return
       }
 
       if (data && data.length > 0) {
         const count = data.length
-        const sum = data.reduce((acc, review) => acc + review.rating, 0)
+        const sum = data.reduce((acc, review: { rating: number }) => acc + review.rating, 0)
         const average = count ? sum / count : 0
-        setReviewData({ count, average })
+        setReviewData({ count, average: parseFloat(average.toFixed(1)) })
       } else {
         setReviewData({ count: 0, average: 0 })
       }
@@ -220,15 +208,13 @@ function ProductCard({ product }: { product: Product }) {
 
     fetchReviews()
 
-    // Optional: Set up real-time listener for reviews if needed
+    // Real-time listener setup
     const reviewSubscription = supabase
       .channel(`reviews_for_product_${product.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reviews", filter: `product_id=eq.${product.id}` },
-        (payload) => {
-          fetchReviews() // Re-fetch reviews on change
-        },
+        () => fetchReviews(), // Re-fetch all on change
       )
       .subscribe()
 
@@ -237,116 +223,152 @@ function ProductCard({ product }: { product: Product }) {
     }
   }, [product.id])
 
+  const discountPercent = product.original_price
+    ? Math.round(((product.original_price - product.discount_price) / product.original_price) * 100)
+    : 0
+
   const stockStatus =
     product.stock_quantity === 0
-      ? "out-of-stock"
+      ? { label: "Out of Stock", color: "bg-gray-600", textColor: "text-gray-600" }
       : product.stock_quantity && product.stock_quantity < 10
-        ? "low-stock"
-        : "in-stock"
+        ? { label: "Only Few Left", color: "bg-orange-500", textColor: "text-orange-600" }
+        : { label: "In Stock", color: "bg-green-500", textColor: "text-green-600" }
 
   return (
     <Link
       href={`/product/${product.id}`}
-      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300 group relative flex flex-col h-full"
+      className="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-green-200 flex flex-col h-full"
     >
-      <div className="relative aspect-square rounded-t-lg overflow-hidden">
+      {/* Image Section - Compact Aspect Ratio */}
+      <div className="relative aspect-[3/4] sm:aspect-[3/4] overflow-hidden bg-gray-50">
         <Image
           src={product.product_photo_urls?.[0] || "/placeholder.svg"}
           alt={product.product_name}
           fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-          className="object-cover group-hover:scale-105 transition-transform duration-500"
+          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+          className="object-cover group-hover:scale-110 transition-transform duration-700"
+          priority={false}
         />
-        {product.original_price && product.original_price > product.discount_price && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-            {Math.round(((product.original_price - product.discount_price) / product.original_price) * 100)}% OFF
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+        {/* Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
+          {discountPercent > 0 && (
+            <div className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1">
+              <Tag className="w-3 h-3" />
+              {discountPercent}% OFF
+            </div>
+          )}
+          {product.is_best_seller && (
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" />
+              Bestseller
+            </div>
+          )}
+        </div>
+
+        {/* Stock Badge */}
+        {product.stock_quantity !== undefined && product.stock_quantity < 50 && (
+          <div className={`absolute bottom-3 left-3 ${stockStatus.color} text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg`}>
+            {stockStatus.label}
           </div>
         )}
-        {stockStatus === "low-stock" && (
-          <div className="absolute bottom-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full">
-            Low Stock
-          </div>
-        )}
-        {stockStatus === "out-of-stock" && (
-          <div className="absolute bottom-2 left-2 bg-gray-700 text-white text-xs px-2 py-1 rounded-full">
-            Out of Stock
-          </div>
-        )}
+
         <FavButton product={product} />
       </div>
-      <div className="p-4 flex-grow flex flex-col">
-        {/* Added null checks for product.company */}
+
+      {/* Content Section */}
+      <div className="p-3 sm:p-4 flex-grow flex flex-col">
+        {/* Company Info */}
         {product.company && (
           <div className="flex items-center gap-2 mb-2">
             <Image
               src={product.company.company_logo_url || "/placeholder.svg"}
-              alt={product.company.company_name || "Company Logo"}
-              width={16}
-              height={16}
-              className="rounded-full"
+              alt={product.company.company_name || "Brand"}
+              width={20}
+              height={20}
+              className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-gray-200"
             />
-            <span className="text-xs text-gray-600 truncate">{product.company.company_name}</span>
+            <span className="text-xs sm:text-sm text-gray-600 font-medium truncate">
+              {product.company.company_name}
+            </span>
           </div>
         )}
-        <h3 className="font-medium text-gray-900 mb-1 text-sm sm:text-base line-clamp-2 flex-grow">
+
+        {/* Product Name - Single Line, smaller font, truncated */}
+        <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
           {product.product_name}
         </h3>
-        {/* Display actual aggregated review stars and review count */}
-        <div className="flex items-center gap-1 mb-2">
-          <div className="flex text-yellow-400">
+
+        {/* Rating */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-0.5">
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
-                className={`w-3 h-3 ${i < Math.round(reviewData.average) ? "fill-current" : "text-gray-300"}`}
+                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                  i < Math.round(reviewData.average)
+                    ? "fill-yellow-400 text-yellow-400"
+                    : "fill-gray-200 text-gray-200"
+                }`}
               />
             ))}
           </div>
-          <span className="text-xs text-gray-500">({reviewData.count})</span>
+          <span className="text-xs sm:text-sm text-gray-600 font-medium">
+            {reviewData.average.toFixed(1)} ({reviewData.count})
+          </span>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-base sm:text-lg font-bold text-gray-900">₹{product.discount_price.toFixed(2)}</span>
+
+        {/* Price Section */}
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-xl sm:text-2xl font-bold text-gray-900">
+            ₹{product.discount_price.toFixed(2)}
+          </span>
           {product.original_price && product.original_price > product.discount_price && (
-            <span className="text-xs sm:text-sm text-gray-400 line-through">₹{product.original_price.toFixed(2)}</span>
+            <span className="text-sm sm:text-base text-gray-400 line-through">
+              ₹{product.original_price.toFixed(2)}
+            </span>
           )}
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
-          {/* Assuming is_organic is a boolean field in your products table */}
-          {/* You might need to adjust this based on how you store 'organic' status */}
-          {/* For now, I'll assume if it's not explicitly false, it's considered organic for display */}
-          {true && (
-            <div className="flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-green-600" />
-              <span>Certified Organic</span>
-            </div>
-          )}
+
+        {/* Organic Badge - pushed to bottom */}
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-green-700 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 mt-auto">
+          <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+          <span className="font-medium">Certified Organic</span>
         </div>
+        
+        {/* NO "View Product" button */}
       </div>
     </Link>
   )
 }
 
-
-// Product Skeleton for loading state
+// Enhanced Product Skeleton - Compacted
 function ProductSkeleton() {
   return (
-    <div className="bg-white rounded-lg shadow-sm h-full">
-      <Skeleton className="aspect-square rounded-t-lg w-full" />
-      <div className="p-4">
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+      <div className="aspect-[3/4] sm:aspect-[3/4] bg-gray-200" />
+      <div className="p-3 sm:p-4">
         <div className="flex items-center gap-2 mb-2">
-          <Skeleton className="w-4 h-4 rounded-full" />
-          <Skeleton className="h-3 w-24" />
+          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-200" />
+          <div className="h-3 bg-gray-200 rounded w-20" />
         </div>
-        <Skeleton className="h-5 w-full mb-1" />
-        <Skeleton className="h-5 w-3/4 mb-4" />
-        <Skeleton className="h-3 w-20 mb-2" />
-        <Skeleton className="h-6 w-16 mb-3" />
-        <Skeleton className="h-3 w-32" />
+        <div className="h-4 bg-gray-200 rounded w-full mb-3" /> 
+        <div className="flex gap-1 mb-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="w-3.5 h-3.5 bg-gray-200 rounded" />
+          ))}
+        </div>
+        <div className="h-6 bg-gray-200 rounded w-24 mb-3" />
+        <div className="h-8 bg-gray-200 rounded-lg mt-auto" />
       </div>
     </div>
   )
 }
 
-// Main Home Component
+// Main Component (Home)
 export default function Home() {
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
@@ -355,107 +377,24 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<"all" | "deals" | "bestsellers">("all")
   const [isCompanyApproved, setIsCompanyApproved] = useState<boolean | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [homeSearchTerm, setHomeSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
 
-  // Client-side filter for category, deals, best-sellers and search
-  const getFilteredProducts = useCallback(() => {
-    let filtered = [...products]
-
-    if (selectedCategory) {
-      filtered = filtered.filter((p) => p.categories?.some((c) => c.main === selectedCategory))
-    }
-
-    if (activeFilter === "deals") {
-      filtered = filtered.filter((p) => p.original_price && p.original_price > p.discount_price)
-    } else if (activeFilter === "bestsellers") {
-      filtered = filtered.filter((p) => p.is_best_seller)
-    }
-
-    if (homeSearchTerm) {
-      filtered = filtered.filter((p) => p.product_name.toLowerCase().includes(homeSearchTerm.toLowerCase()))
-    }
-
-    return filtered
-  }, [products, selectedCategory, activeFilter, homeSearchTerm])
-
-  // Define categories with full names matching Supabase
+  // --- Category Definitions ---
   const carouselCategories = [
-    {
-      id: 1,
-      title: "Organic Groceries and Superfoods",
-      subtitle: "Fresh & Healthy",
-      icon: "🥦",
-      image: "https://www.pricechopper.com/wp-content/uploads/2022/07/072222_OrganicPage.png",
-    },
-    {
-      id: 2,
-      title: "Herbal & Natural Personal Care",
-      subtitle: "Pure & Gentle",
-      icon: "🧴",
-      image: "https://media.ahmedabadmirror.com/am/uploads/mediaGallery/image/1679590753548.jpg-org",
-    },
-    {
-      id: 3,
-      title: "Health & Wellness Products",
-      subtitle: "Boost Wellbeing",
-      icon: "🌿",
-      image: "https://media.ahmedabadmirror.com/am/uploads/mediaGallery/image/1679590753548.jpg-org",
-    },
-    {
-      id: 4,
-      title: "Sustainable Home & Eco-Friendly Living",
-      subtitle: "Green Living",
-      icon: "♻️",
-      image:
-        "https://previews.123rf.com/images/baibakova/baibakova2007/baibakova200700306/152273705-bowls-of-various-superfoods-on-gray-background-healthy-organic-food-clean-eating-top-view.jpg",
-    },
-    {
-      id: 5,
-      title: "Sustainable Fashion & Accessories",
-      subtitle: "Eco-Chic Styles",
-      icon: "👕",
-      image:
-        "https://previews.123rf.com/images/baibakova/baibakova2007/baibakova200700306/152273705-bowls-of-various-superfoods-on-gray-background-healthy-organic-food-clean-eating-top-view.jpg",
-    },
-    {
-      id: 6,
-      title: "Organic Baby & Kids Care",
-      subtitle: "For Little Ones",
-      icon: "👶",
-      image:
-        "https://previews.123rf.com/images/baibakova/baibakova2007/baibakova200700306/152273705-bowls-of-various-superfoods-on-gray-background-healthy-organic-food-clean-eating-top-view.jpg",
-    },
-    {
-      id: 7,
-      title: "Organic Pet Care",
-      subtitle: "For Your Pets",
-      icon: "🐾",
-      image:
-        "https://previews.123rf.com/images/baibakova/baibakova2007/baibakova200700306/152273705-bowls-of-various-superfoods-on-gray-background-healthy-organic-food-clean-eating-top-view.jpg",
-    },
-    {
-      id: 8,
-      title: "Special Dietary & Lifestyle Products",
-      subtitle: "For Your Lifestyle",
-      icon: "🥗",
-      image:
-        "https://previews.123rf.com/images/baibakova/baibakova2007/baibakova200700306/152273705-bowls-of-various-superfoods-on-gray-background-healthy-organic-food-clean-eating-top-view.jpg",
-    },
+    { id: 1, title: "Organic Groceries and Superfoods", subtitle: "Fresh & Healthy", icon: "🥦", image: "" },
+    { id: 2, title: "Herbal & Natural Personal Care", subtitle: "Pure & Gentle", icon: "🧴", image: "" },
+    { id: 3, title: "Health & Wellness Products", subtitle: "Boost Wellbeing", icon: "🌿", image: "" },
+    { id: 4, title: "Sustainable Home & Eco-Friendly Living", subtitle: "Green Living", icon: "♻️", image: "" },
+    { id: 5, title: "Sustainable Fashion & Accessories", subtitle: "Eco-Chic Styles", icon: "👕", image: "" },
+    { id: 6, title: "Organic Baby & Kids Care", subtitle: "For Little Ones", icon: "👶", image: "" },
+    { id: 7, title: "Organic Pet Care", subtitle: "For Your Pets", icon: "🐾", image: "" },
+    { id: 8, title: "Special Dietary & Lifestyle Products", subtitle: "For Your Lifestyle", icon: "🥗", image: "" },
   ]
 
-  // Check user and company approval status for redirection
+  // --- Auth and Redirection Logic ---
   useEffect(() => {
     const checkUserAndApproval = async () => {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        console.error("Error getting session:", sessionError)
-        return
-      }
-
+      const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         setIsLoggedIn(true)
         const userId = session.user.id
@@ -481,7 +420,7 @@ export default function Home() {
 
     checkUserAndApproval()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
       checkUserAndApproval()
     })
 
@@ -496,7 +435,8 @@ export default function Home() {
     }
   }, [isLoggedIn, isCompanyApproved, router])
 
-  // Fetch products based on current filters
+
+  // --- Data Fetching Logic ---
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
     let query = supabase
@@ -510,67 +450,69 @@ export default function Home() {
       .eq("is_approved", true)
       .order("created_at", { ascending: false })
 
-    if (activeFilter === "deals") {
-      query = query.gt("original_price", ("discount_price"))
-    } else if (activeFilter === "bestsellers") {
+    if (activeFilter === "bestsellers") {
       query = query.eq("is_best_seller", true)
     }
 
-    if (homeSearchTerm) {
-      query = query.ilike("product_name", `%${homeSearchTerm}%`)
+    if (searchTerm) {
+      query = query.ilike("product_name", `%${searchTerm}%`)
     }
 
     const { data, error } = await query
 
     if (error) {
       console.error("Error fetching products:", error)
-      setIsLoading(false)
-      return
+      setProducts([])
+    } else {
+      let filteredData = data as Product[]
+      if (activeFilter === "deals") {
+        filteredData = filteredData.filter(p => p.original_price && p.original_price > p.discount_price)
+      }
+      setProducts(filteredData)
     }
-
-    setProducts(data || [])
     setIsLoading(false)
-  }, [activeFilter, homeSearchTerm]) // Dependencies for useCallback
+  }, [activeFilter, searchTerm])
 
   useEffect(() => {
     fetchProducts()
 
-    // Set up real-time listener for products (optional, for immediate updates)
-    // This listener will re-fetch all approved products on any change,
-    // then the `fetchProducts` useCallback will re-apply the current filters.
     const productSubscription = supabase
       .channel("products_changes")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products", filter: "is_approved=eq.true" },
-        (payload) => {
-          fetchProducts() // Re-fetch products on change
-        },
+        () => fetchProducts(),
       )
       .subscribe()
 
     return () => {
       productSubscription.unsubscribe()
     }
-  }, [fetchProducts]) // Dependency on fetchProducts
+  }, [fetchProducts])
 
-  // Toggle filter: clicking the same category clears the selection
+  // --- Client-side Filtering and Handlers ---
+  const getFilteredProducts = useCallback(() => {
+    let filtered = [...products]
+
+    if (selectedCategory) {
+      filtered = filtered.filter((p) => p.categories?.some((c) => c.main === selectedCategory))
+    }
+
+    return filtered
+  }, [products, selectedCategory])
+
   const handleCategoryClick = useCallback((cat: string) => {
     setSelectedCategory((prevCat) => (prevCat === cat ? null : cat))
-    setActiveFilter("all") // Reset other filters when category changes
-    setHomeSearchTerm("") // Clear search when category is selected
   }, [])
 
   const handleFilterClick = useCallback((filter: "all" | "deals" | "bestsellers") => {
     setActiveFilter(filter)
-    setSelectedCategory(null) // Clear category when filter changes
-    setHomeSearchTerm("") // Clear search when filter changes
+    setSelectedCategory(null)
   }, [])
 
   const handleSearch = useCallback((term: string) => {
-    setHomeSearchTerm(term)
-    setSelectedCategory(null) // Clear category filter when searching
-    setActiveFilter("all") // Reset other filters when searching
+    setSearchTerm(term)
+    setSelectedCategory(null)
   }, [])
 
   // If loading initial user/company status, show a loader
@@ -578,7 +520,7 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
         <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-        <span className="ml-3 text-lg text-blue-700">Loading...</span>
+        <span className="ml-3 text-lg text-blue-700">Loading initial configuration...</span>
       </div>
     )
   }
@@ -586,123 +528,135 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Announcement Bar */}
-      <div className="bg-green-600 text-center py-2 text-xs sm:text-sm text-white px-4">
-        <span className="hidden sm:inline">🌱 Free shipping on orders over ₹1000 | </span>
-        Shop now and get 10% off your first order with code: <span className="font-bold">ORGANIC10</span>
+      <div className="bg-gradient-to-r from-green-600 to-green-500 text-center py-2.5 text-xs sm:text-sm text-white px-4">
+        <div className="flex items-center justify-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          <span className="font-medium">
+            Free shipping on orders over ₹1000 | Use code: <span className="font-bold bg-white/20 px-2 py-0.5 rounded">ORGANIC10</span>
+          </span>
+        </div>
       </div>
-      {/* Header Component */}
-      <Header showSearchBar={true} onSearch={handleSearch} />
-      {/* Category Carousel */}
+
+      {/* RESTORED Header Component */}
+      <Header 
+        showSearchBar={true} 
+        onSearch={handleSearch} 
+      />
+
       <CategoryCarousel
         categories={carouselCategories}
         selectedCategory={selectedCategory}
         onCategoryClick={handleCategoryClick}
       />
+
       {/* Products Section */}
-      <section className="py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+      <section className="py-6 sm:py-10">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Explore Our Products</h2>
-              <p className="text-gray-600">Fresh organic products at the best prices</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Explore Products</h2>
+              <p className="text-sm sm:text-base text-gray-600 mt-1">Fresh organic products at the best prices</p>
             </div>
-            <div className="flex items-center gap-2 bg-white p-1 rounded-lg shadow-sm">
-              <Button
-                variant={activeFilter === "all" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => handleFilterClick("all")}
-                className={activeFilter === "all" ? "bg-green-600 hover:bg-green-700" : ""}
-              >
-                All Products
-              </Button>
-              <Button
-                variant={activeFilter === "deals" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => handleFilterClick("deals")}
-                className={activeFilter === "deals" ? "bg-green-600 hover:bg-green-700" : ""}
-              >
-                Today's Deals
-              </Button>
-              <Button
-                variant={activeFilter === "bestsellers" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => handleFilterClick("bestsellers")}
-                className={activeFilter === "bestsellers" ? "bg-green-600 hover:bg-green-700" : ""}
-              >
-                Best Sellers
-              </Button>
+
+            {/* Filter Buttons */}
+            <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+              {[
+                { key: "all", label: "All" },
+                { key: "deals", label: "Deals" },
+                { key: "bestsellers", label: "Best Sellers" }
+              ].map((filter) => (
+                <button
+                  key={filter.key}
+                  onClick={() => handleFilterClick(filter.key as any)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                    activeFilter === filter.key
+                      ? "bg-green-600 text-white shadow-md"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
             </div>
           </div>
-          {(selectedCategory || homeSearchTerm) && (
-            <div className="mb-6 flex items-center">
+
+          {/* Active Filters */}
+          {(selectedCategory || searchTerm || activeFilter !== 'all') && (
+            <div className="flex items-center gap-2 mb-6 flex-wrap">
+              {(selectedCategory || searchTerm) && <span className="text-sm font-semibold text-gray-700">Active Filters:</span>}
+              
               {selectedCategory && (
-                <Badge variant="outline" className="bg-green-50 text-green-800 px-3 py-1">
-                  Category: {selectedCategory}
-                </Badge>
+                <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-lg text-sm font-medium border border-green-200">
+                  Category: {selectedCategory.split(" ")[0]}
+                </span>
               )}
-              {homeSearchTerm && (
-                <Badge variant="outline" className="bg-blue-50 text-blue-800 px-3 py-1 ml-2">
-                  Search: {homeSearchTerm}
-                </Badge>
+              {searchTerm && (
+                <span className="bg-blue-100 text-blue-800 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-200">
+                  Search: "{searchTerm}"
+                </span>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-500 ml-2 h-7 w-7 p-0"
+              {activeFilter !== 'all' && (
+                <span className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg text-sm font-medium border border-amber-200">
+                  Filter: {activeFilter === 'deals' ? "Today's Deals" : "Bestsellers"}
+                </span>
+              )}
+              
+              <button
                 onClick={() => {
                   setSelectedCategory(null)
-                  setHomeSearchTerm("")
+                  setSearchTerm("")
                   setActiveFilter("all")
                 }}
+                className="text-gray-500 hover:text-red-500 text-sm font-medium ml-2"
               >
-                ✕
-              </Button>
+                ✕ Clear All
+              </button>
             </div>
           )}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {isLoading ? (
-              Array(8)
-                .fill(0)
-                .map((_, index) => <ProductSkeleton key={index} />)
-            ) : getFilteredProducts().length > 0 ? (
-              getFilteredProducts().map((product) => <ProductCard key={product.id} product={product} />)
-            ) : (
-              <div className="col-span-full py-12 text-center">
-                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Filter className="w-10 h-10 text-gray-400" />
+
+          {/* Products Grid - 2 columns on mobile, responsive on larger screens */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+            {isLoading
+              ? Array(8).fill(0).map((_, i) => <ProductSkeleton key={i} />)
+              : getFilteredProducts().length > 0
+              ? getFilteredProducts().map((product) => <ProductCard key={product.id} product={product} />)
+              : (
+                <div className="col-span-full py-12 text-center bg-white rounded-xl shadow-inner border border-dashed border-gray-300">
+                  <div className="mx-auto w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <Filter className="w-10 h-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
+                  <p className="text-gray-500 mb-4">Try adjusting your filters, clearing your search, or viewing all products.</p>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory(null)
+                      setActiveFilter("all")
+                      setSearchTerm("")
+                    }}
+                    className="px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors shadow-md"
+                  >
+                    Clear Filters
+                  </button>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No products found</h3>
-                <p className="text-gray-500 mb-4">Try changing your filter criteria</p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedCategory(null)
-                    setActiveFilter("all")
-                    setHomeSearchTerm("")
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            )}
+              )}
           </div>
+
+          {/* View All Button */}
           {getFilteredProducts().length > 0 && (
             <div className="mt-10 text-center">
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="border-green-600 text-green-600 hover:bg-green-50 bg-transparent"
-              >
-                <Link href="/shop">
-                  View All Products <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              <Link href="/shop" passHref>
+                <button className="px-8 py-3 border-2 border-green-600 text-green-600 rounded-xl font-semibold hover:bg-green-50 transition-all inline-flex items-center gap-2 group shadow-md hover:shadow-lg">
+                  View All Products
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </Link>
             </div>
           )}
         </div>
       </section>
-      {/* Footer Component */}
+
+      {/* RESTORED Footer Component */}
       <Footer />
     </main>
   )
