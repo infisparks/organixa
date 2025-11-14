@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
@@ -35,9 +34,6 @@ export default function LoginForm() {
   
   // New helper function to check role and redirect
   const handleRoleRedirect = async (userId: string) => {
-    // Note: We don't call setLoading(true) here because it's already set in handleLogin
-    // We only set it to false on completion if it's the final action.
-    
     // Check if the user ID exists in the 'companies' table
     const { data: companyData, error: companyError } = await supabase
         .from("companies")
@@ -56,7 +52,6 @@ export default function LoginForm() {
     }
   }
 
-  // FIX: Changed React.FormFormEvent to React.FormEvent
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -83,13 +78,10 @@ export default function LoginForm() {
         description: err.message || "Please check your credentials.", 
         variant: "destructive",
       })
-      // If login fails, loading must be set to false immediately.
       setLoading(false);
     } 
-    // The handleRoleRedirect function handles the final setLoading(false) on success.
   }
 
-  // FIX: Added 'finally' block to handle loading state in Google login
   const handleGoogleLogin = async () => {
     setLoading(true)
     setError(null)
@@ -110,7 +102,6 @@ export default function LoginForm() {
         variant: 'destructive',
       })
     } finally {
-      // Ensure loading is reset if redirection fails or an error occurs locally
       setLoading(false);
     }
   }

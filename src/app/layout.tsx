@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+// We will create this component next
+import ClientLayoutWrapper from "@/components/ClientLayoutWrapper";
+// Assuming you have shadcn/ui setup, let's add the Toaster
+// import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +31,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        {/*
+          This wrapper will handle the session check and
+          show the address modal if needed.
+        */}
+        <ClientLayoutWrapper>
+          {children}
+        </ClientLayoutWrapper>
+        {/* Toaster for showing success/error messages */}
+        {/* <Toaster /> */}
       </body>
     </html>
   );
