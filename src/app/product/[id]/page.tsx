@@ -4,14 +4,7 @@ import { supabase } from "../../../lib/supabase"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 
-// 🎯 Define props for your dynamic route
-interface ProductPageProps {
-  params: {
-    id: string
-  }
-}
-
-// Generate static params (for SSG)
+// SSG parameters
 export async function generateStaticParams() {
   const { data, error } = await supabase
     .from("products")
@@ -19,17 +12,26 @@ export async function generateStaticParams() {
     .eq("is_approved", true)
 
   if (error) {
-    console.error("Error fetching product IDs for static params:", error)
+    console.error("Static params fetch error:", error)
     return []
   }
 
-  return data.map((product) => ({ id: product.id.toString() }))
+  return data.map((product) => ({
+    id: product.id.toString(),
+  }))
 }
 
-// ✅ Ignore internal Next.js type mismatch warning
-//ts-expect-error Next.js internal type system expects params as Promise, but runtime gives plain object
-export default async function ProductPage({ params }: ProductPageProps) {
-  // Fetch product details from Supabase, including company information
+// --- IMPORTANT FIX ---
+// Do NOT define custom interface for props
+// Let Next.js automatically type the params
+
+export default async function ProductPage({
+  params,
+}: {
+  params: { id: string }
+}) {
+  const { id } = params
+
   const { data: productFound, error } = await supabase
     .from("products")
     .select(
@@ -38,7 +40,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       company:companies(company_name, company_logo_url)
     `
     )
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("is_approved", true)
     .single()
 
@@ -47,7 +49,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
     return notFound()
   }
 
-  // Map Supabase data to ProductDetails props
   const productDetailsProps = {
     id: productFound.id,
     productName: productFound.product_name,
