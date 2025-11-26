@@ -75,7 +75,8 @@ export default function AddProductPage() {
   // General file upload function for Supabase Storage
   const uploadFile = async (file: File, bucketName: string, folder: string) => {
     if (!companyId) throw new Error("Company ID is missing for file upload.")
-    const uniqueFileName = `${folder}/${companyId}/${file.name}-${crypto.randomUUID()}`
+    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+    const uniqueFileName = `${folder}/${companyId}/${sanitizedFileName}-${crypto.randomUUID()}`
     const { data, error } = await supabase.storage.from(bucketName).upload(uniqueFileName, file, {
       cacheControl: "3600",
       upsert: false,
