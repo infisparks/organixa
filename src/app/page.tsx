@@ -66,21 +66,21 @@ const getCompanyLogoUrlFromPath = (path: string | undefined): string => {
 // --- 3. Product Skeleton (DEFINED ONLY ONCE) ---
 function ProductSkeleton() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
-      <div className="aspect-[3/4] sm:aspect-[3/4] bg-gray-200" />
-      <div className="p-3 sm:p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-200" />
-          <div className="h-3 bg-gray-200 rounded w-20" />
+    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 animate-pulse">
+      <div className="aspect-[3/4] sm:aspect-square bg-gray-200" />
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-4 h-4 rounded-full bg-gray-200" />
+          <div className="h-2.5 bg-gray-200 rounded w-16" />
         </div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-3" /> 
-        <div className="flex gap-1 mb-3">
+        <div className="h-3.5 bg-gray-200 rounded w-full mb-2" /> 
+        <div className="flex gap-1 mb-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-3.5 h-3.5 bg-gray-200 rounded" />
+            <div key={i} className="w-3 h-3 bg-gray-200 rounded" />
           ))}
         </div>
-        <div className="h-6 bg-gray-200 rounded w-24 mb-3" />
-        <div className="h-8 bg-gray-200 rounded-lg mt-auto" />
+        <div className="h-5 bg-gray-200 rounded w-20 mb-2" />
+        <div className="h-7 bg-gray-200 rounded-lg mt-auto" />
       </div>
     </div>
   )
@@ -122,7 +122,7 @@ type CategoryProps = {
 // Enhanced Category Carousel with better mobile UX (Scrollable)
 function CategoryCarousel({ categories, selectedCategory, onCategoryClick }: CategoryProps) {
   return (
-    <section className="py-4 bg-gradient-to-b from-white to-gray-50/50">
+    <section className="py-4 bg-gradient-to-b from-white to-gray-50/50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         {/* Scrollable Container */}
         <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
@@ -132,28 +132,28 @@ function CategoryCarousel({ categories, selectedCategory, onCategoryClick }: Cat
                 key={cat.id}
                 onClick={() => onCategoryClick(cat.title)}
                 className={`flex-shrink-0 transition-all duration-300 ${
-                  selectedCategory === cat.title ? "scale-105" : "hover:scale-102"
+                  selectedCategory === cat.title ? "scale-[1.03] shadow-xl" : "hover:scale-[1.02]"
                 }`}
               >
                 <div
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl border-2 transition-all whitespace-nowrap ${
                     selectedCategory === cat.title
-                      ? "border-green-500 bg-green-50 shadow-lg shadow-green-100"
+                      ? "border-green-500 bg-green-50 shadow-green-100"
                       : "border-gray-200 bg-white hover:border-green-300 hover:shadow-md"
                   }`}
                 >
-                  <div className={`text-2xl sm:text-3xl flex-shrink-0 transition-transform duration-300 ${
+                  <div className={`text-xl sm:text-2xl flex-shrink-0 transition-transform duration-300 ${
                     selectedCategory === cat.title ? "scale-110" : ""
                   }`}>
                     {cat.icon}
                   </div>
-                  <div className="text-left min-w-[120px] sm:min-w-[140px]">
-                    <p className={`font-semibold text-sm sm:text-base leading-tight ${
+                  <div className="text-left min-w-[100px] sm:min-w-[120px]">
+                    <p className={`font-bold text-sm leading-tight ${
                       selectedCategory === cat.title ? "text-green-700" : "text-gray-800"
                     }`}>
                       {cat.title.split(" ")[0]}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{cat.subtitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">{cat.subtitle}</p>
                   </div>
                 </div>
               </button>
@@ -236,7 +236,7 @@ function FavButton({ product }: { product: Product }) {
       <button
         onClick={toggleFav}
         disabled={isLoading}
-        className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-sm transition-all duration-300 z-10 
+        className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-sm transition-all duration-300 z-10 
           ${isLoading ? "opacity-50 cursor-not-allowed" : "opacity-100"}
           ${isFav
             ? "bg-red-500 hover:bg-red-600 shadow-lg scale-110"
@@ -260,13 +260,13 @@ function FavButton({ product }: { product: Product }) {
   )
 }
 
-// Professional Product Card with dynamic review fetching - UPDATED
+// Professional Product Card with dynamic review fetching - UPDATED FOR UX/UI
+// Professional Product Card with dynamic review fetching - UPDATED FOR UX/UI
 function ProductCard({ product, index }: { product: Product, index: number }) {
   const [reviewData, setReviewData] = useState({ count: 0, average: 0 })
 
   useEffect(() => {
     const fetchReviews = async () => {
-      // Assuming 'reviews' table exists and has 'product_id' and 'rating' columns
       const { data, error } = await supabase.from("reviews").select("rating").eq("product_id", product.id)
 
       if (error) {
@@ -286,7 +286,6 @@ function ProductCard({ product, index }: { product: Product, index: number }) {
 
     fetchReviews()
 
-    // Real-time listener setup
     const reviewSubscription = supabase
       .channel(`reviews_for_product_${product.id}`)
       .on(
@@ -315,42 +314,39 @@ function ProductCard({ product, index }: { product: Product, index: number }) {
   return (
     <Link
       href={`/product/${product.id}`}
-      className="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-green-200 flex flex-col h-full"
+      // Adjusted card styling for smaller footprint and better mobile layout
+      className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-green-300 flex flex-col h-full"
     >
-      {/* Image Section - Compact Aspect Ratio */}
-      <div className="relative aspect-[3/4] sm:aspect-[3/4] overflow-hidden bg-gray-50">
+      {/* Image Section - Adjusted Aspect Ratio for square look */}
+      <div className="relative aspect-square overflow-hidden bg-gray-50">
         <Image
-          // Use the product image helper
           src={getPublicUrlFromPath(product.product_photo_urls?.[0])}
           alt={product.product_name}
           fill
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-          className="object-cover group-hover:scale-110 transition-transform duration-700"
+          className="object-cover group-hover:scale-110 transition-transform duration-500"
           priority={index === 0} // LCP Fix: Set priority for the first product card
         />
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
         {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
           {discountPercent > 0 && (
-            <div className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1">
-              <Tag className="w-3 h-3" />
+            <div className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+              <Tag className="w-2.5 h-2.5" />
               {discountPercent}% OFF
             </div>
           )}
           {product.is_best_seller && (
-            <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              Bestseller
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+              <TrendingUp className="w-2.5 h-2.5" />
+              Best
             </div>
           )}
         </div>
 
         {/* Stock Badge */}
         {product.stock_quantity !== undefined && product.stock_quantity < 50 && (
-          <div className={`absolute bottom-3 left-3 ${stockStatus.color} text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg`}>
+          <div className={`absolute bottom-2 left-2 ${stockStatus.color} text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-lg`}>
             {stockStatus.label}
           </div>
         )}
@@ -358,37 +354,36 @@ function ProductCard({ product, index }: { product: Product, index: number }) {
         <FavButton product={product} />
       </div>
 
-      {/* Content Section */}
-      <div className="p-3 sm:p-4 flex-grow flex flex-col">
-        {/* Company Info */}
+      {/* Content Section - Reduced Padding and Font Size */}
+      <div className="p-3 flex-grow flex flex-col">
+        {/* Company Info - Tighter spacing (gap-1.5 -> gap-1) */}
         {product.company && (
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1 mb-1">
             <Image
-              // Uses the corrected company logo helper
               src={getCompanyLogoUrlFromPath(product.company.company_logo_url) || "/placeholder.svg"}
               alt={product.company.company_name || "Brand"}
-              width={20}
-              height={20}
-              className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-gray-200"
+              width={16}
+              height={16}
+              className="w-4 h-4 rounded-full object-cover border border-gray-200"
             />
-            <span className="text-xs sm:text-sm text-gray-600 font-medium truncate">
+            <span className="text-xs text-gray-600 font-medium truncate">
               {product.company.company_name}
             </span>
           </div>
         )}
 
-        {/* Product Name - Single Line, smaller font, truncated */}
-        <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
+        {/* Product Name - FIX: Strict one-line with ellipsis */}
+        <h3 className="font-semibold text-gray-900 mb-1 text-sm line-clamp-1 overflow-hidden whitespace-nowrap text-ellipsis">
           {product.product_name}
         </h3>
 
-        {/* Rating Section */}
-        <div className="flex items-center gap-2 mb-3">
+        {/* Rating Section - Tighter spacing (mb-2 -> mb-1) and smaller stars */}
+        <div className="flex items-center gap-1 mb-1">
           <div className="flex items-center gap-0.5">
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
-                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                className={`w-3 h-3 ${
                   i < Math.round(reviewData.average)
                     ? "fill-yellow-400 text-yellow-400"
                     : "fill-gray-200 text-gray-200"
@@ -396,35 +391,32 @@ function ProductCard({ product, index }: { product: Product, index: number }) {
               />
             ))}
           </div>
-          <span className="text-xs sm:text-sm text-gray-600 font-medium">
+          <span className="text-xs text-gray-500 font-medium">
             {reviewData.average.toFixed(1)} ({reviewData.count})
           </span>
         </div>
 
-        {/* Price Section */}
-        <div className="flex items-baseline gap-2 mb-3">
-          <span className="text-xl sm:text-2xl font-bold text-gray-900">
+        {/* Price Section - Tighter spacing (mb-2 -> mb-1) and smaller Price */}
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="text-lg font-bold text-gray-900">
             ₹{product.discount_price.toFixed(2)}
           </span>
           {product.original_price && product.original_price > product.discount_price && (
-            <span className="text-sm sm:text-base text-gray-400 line-through">
+            <span className="text-xs text-gray-400 line-through">
               ₹{product.original_price.toFixed(2)}
             </span>
           )}
         </div>
 
-        {/* Organic Badge - pushed to bottom */}
-        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-green-700 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 mt-auto">
-          <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+        {/* Organic Badge - Tighter spacing and smaller py */}
+        <div className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-200 mt-2">
+          <ShieldCheck className="w-3 h-3 flex-shrink-0" />
           <span className="font-medium">Certified Organic</span>
         </div>
-        
-        {/* NO "View Product" button */}
       </div>
     </Link>
   )
 }
-
 
 // Main Component (Home)
 export default function Home() {
@@ -671,12 +663,12 @@ export default function Home() {
             </div>
           )}
 
-          {/* Products Grid - 2 columns on mobile, responsive on larger screens */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+          {/* Products Grid - FIX: grid-cols-2 on mobile, responsive on larger screens */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {isLoading
               ? Array(8).fill(0).map((_, i) => <ProductSkeleton key={i} />)
               : getFilteredProducts().length > 0
-              ? getFilteredProducts().map((product, index) => <ProductCard key={product.id} product={product} index={index} />) // Added index here
+              ? getFilteredProducts().map((product, index) => <ProductCard key={product.id} product={product} index={index} />)
               : (
                 <div className="col-span-full py-12 text-center bg-white rounded-xl shadow-inner border border-dashed border-gray-300">
                   <div className="mx-auto w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
