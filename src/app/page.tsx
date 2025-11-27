@@ -40,17 +40,18 @@ const getPublicUrlFromPath = (path: string | undefined): string => {
 
 // --- 2. Helper function for Company Logo path resolution (company-documents bucket) ---
 /**
- * Helper function to reconstruct the public URL from the stored path.
- * The paths are stored in the 'company-documents' bucket.
- * @param path The relative path stored in the database (e.g., 'logos/123/file.webp')
+ * Helper function to reconstruct the public URL from the stored path (e.g., 'logos/123/...').
+ * Targets the 'company-documents' bucket.
+ * @param path The relative path stored in the database.
  * @returns The full public URL string.
  */
 const getCompanyLogoUrlFromPath = (path: string | undefined): string => {
     if (!path) {
         return "/placeholder.svg"; // Default placeholder if path is missing
     }
+    // TARGETS THE CORRECT BUCKET: company-documents
     const { data } = supabase.storage
-        .from("company-documents")
+        .from("company-documents") 
         .getPublicUrl(path);
 
     return data.publicUrl || "/placeholder.svg";
@@ -357,7 +358,7 @@ function ProductCard({ product }: { product: Product }) {
         {product.company && (
           <div className="flex items-center gap-2 mb-2">
             <Image
-              // Use the company logo helper
+              // Uses the company logo helper (targets 'company-documents')
               src={getCompanyLogoUrlFromPath(product.company.company_logo_url) || "/placeholder.svg"}
               alt={product.company.company_name || "Brand"}
               width={20}
