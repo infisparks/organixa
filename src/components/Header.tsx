@@ -120,19 +120,22 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
   return (
     <nav className="bg-white border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-        {/* Mobile Menu Button */}
-        <button
-          className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
-          onClick={() => setIsMobileMenuOpen(true)}
-          aria-label="Open mobile menu"
-        >
-          <Menu className="w-6 h-6 text-gray-600" />
-        </button>
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <Leaf className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 group-hover:rotate-12 transition-transform duration-300" />
-          <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">organicza</span>
-        </Link>
+        {/* Mobile Menu Button & Logo Group */}
+        <div className="flex items-center gap-3">
+            <button
+                className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
+                onClick={() => setIsMobileMenuOpen(true)}
+                aria-label="Open mobile menu"
+            >
+                <Menu className="w-6 h-6 text-gray-600" />
+            </button>
+            {/* Logo (Main Header) - Hide Leaf icon on mobile (md:flex) */}
+            <Link href="/" className="flex items-center gap-2 group">
+                <Leaf className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 md:flex hidden group-hover:rotate-12 transition-transform duration-300" />
+                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">organicza</span>
+            </Link>
+        </div>
+        
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
           <Link href="/" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
@@ -162,12 +165,13 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
             </Link>
           )}
         </div>
-        {/* Right Section */}
+        
+        {/* Right Section (Search & Icons) */}
         <div className="flex items-center gap-3 sm:gap-6">
-          {/* Search Bar (Desktop & Mobile) */}
+          {/* Search Bar (Mobile & Desktop) */}
           {showSearchBar && (
             <>
-              {/* Desktop Search Input */}
+              {/* Desktop Search Input (sm and up) */}
               <div className="hidden sm:block relative">
                 <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
                 <Input
@@ -178,22 +182,23 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-[140px] sm:w-[180px] lg:w-[220px] focus:ring-green-500 focus:border-green-500 transition-all duration-300"
                 />
               </div>
-              {/* Mobile Search Button (as input) */}
-              <div className="sm:hidden relative">
+              {/* Mobile Search Input (only on xs screen) */}
+              <div className="sm:hidden relative flex-grow"> 
                 <Search className="w-6 h-6 text-gray-600 absolute left-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
                 <Input
                   type="text"
                   placeholder="Search..."
                   value={localSearchTerm}
                   onChange={handleSearchInputChange}
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-32 focus:ring-green-500 focus:border-green-500"
+                  // FIX: Adjusted width to fill space better on mobile
+                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-full focus:ring-green-500 focus:border-green-500"
                 />
               </div>
             </>
           )}
 
           {/* Favorites Icon */}
-          <Link href="/addfav" className="relative" aria-label="View favorites">
+          <Link href="/addfav" className="relative flex-shrink-0" aria-label="View favorites">
             <Heart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
             {favCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-pink-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
@@ -202,7 +207,7 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
             )}
           </Link>
           {/* Shopping Cart Icon */}
-          <Link href="/cart" className="relative" aria-label="View shopping cart">
+          <Link href="/cart" className="relative flex-shrink-0" aria-label="View shopping cart">
             <ShoppingCart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
             {cartCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-green-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
@@ -219,7 +224,7 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
             <div className="p-4 border-b flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Leaf className="h-6 w-6 text-green-600" />
-                <span className="text-xl font-bold text-gray-900">organicza</span>
+                {/* Mobile Menu Title is explicitly removed here */}
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
