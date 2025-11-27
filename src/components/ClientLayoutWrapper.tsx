@@ -46,13 +46,15 @@ export default function ClientLayoutWrapper({
   const [loading, setLoading] = useState(true);
 
   const pathname = usePathname();
-  const hasFetchedOnce = useRef(false); // ✅ prevents re-fetch on tab switch
+  const hasFetchedOnce = useRef(false);
 
   /* ===================== PROFILE CHECK ===================== */
 
   const checkUserAndProfile = async (silent = false) => {
+    // CRITICAL FIX: Never show loader if we have fetched once, 
+    // regardless of what triggered this function.
     if (!silent && !hasFetchedOnce.current) {
-      setLoading(true); // ✅ Only show loader on very first load
+      setLoading(true);
     }
 
     const {
@@ -70,11 +72,9 @@ export default function ClientLayoutWrapper({
 
     setUser(session.user);
 
-    // ✅ If profile already exists, don't refetch (prevents refresh effect)
-    if (profile && silent) {
-      return;
-    }
-
+    // Optimization: If we already have a profile and this is a silent update,
+    // we can skip the DB call if you want, or just let it run in background.
+    // For now, we let it run to keep data fresh, but it won't trigger a loader.
     const { data: userProfile, error } = await supabase
       .from("user_profiles")
       .select("*")
@@ -83,7 +83,8 @@ export default function ClientLayoutWrapper({
 
     if (error) {
       console.error("Profile fetch error:", error.message);
-      setLoading(false);
+      // Even on error, stop loading so the app doesn't hang
+      if (!hasFetchedOnce.current) setLoading(false);
       return;
     }
 
@@ -121,25 +122,29 @@ export default function ClientLayoutWrapper({
   /* ===================== EFFECT ===================== */
 
   useEffect(() => {
-    // ✅ Initial load only once
+    // Initial load
     if (!hasFetchedOnce.current) {
       checkUserAndProfile();
     } else {
-      // ✅ Silent background re-check on route change
+      // Silent background re-check on route change
       checkUserAndProfile(true);
     }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === "SIGNED_IN") {
-          hasFetchedOnce.current = false;
-          checkUserAndProfile();
+      (event, session) => {
+        // CRITICAL FIX: When switching tabs, Supabase fires SIGNED_IN.
+        // We must NOT reset hasFetchedOnce here, or the loader will appear 
+        // and unmount your Edit Page.
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          // Pass 'true' to ensure silent update
+          checkUserAndProfile(true); 
         }
 
         if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
           setIsModalOpen(false);
+          hasFetchedOnce.current = false; // Only reset on actual sign out
         }
       }
     );
@@ -158,6 +163,7 @@ export default function ClientLayoutWrapper({
 
   /* ===================== LOADER (FIRST LOAD ONLY) ===================== */
 
+  // Only show full screen loader on the absolute first load of the session
   if (loading && !hasFetchedOnce.current) {
     return (
       <div className="flex h-screen w-full items-center justify-center">

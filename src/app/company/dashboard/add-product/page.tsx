@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import { AlertCircle, ArrowLeft, Loader2, PlusCircle } from "lucide-react"
+import { AlertCircle, Loader2, PlusCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -18,7 +18,6 @@ export default function AddProductPage() {
   const setAddProductFormState = useDashboardStore((state) => state.setAddProductFormState)
   const clearAddProductFormState = useDashboardStore((state) => state.clearAddProductFormState)
 
-  // Initialize form state only once from the store to prevent infinite loops
   const [initialFormState] = useState(() => useDashboardStore.getState().addProductFormState)
 
   const [pageLoading, setPageLoading] = useState(!companyStatus)
@@ -27,7 +26,6 @@ export default function AddProductPage() {
 
   useEffect(() => {
     const checkAuthAndCompanyStatus = async () => {
-      // If we already have valid company status in store, skip fetching
       if (companyStatus) {
         setPageLoading(false)
         return
@@ -63,7 +61,7 @@ export default function AddProductPage() {
           description: "Your company record could not be found or is not approved.",
           variant: "destructive",
         })
-        router.push("/") // Redirect to home/registration if company not found or error
+        router.push("/")
         return
       }
 
@@ -73,11 +71,10 @@ export default function AddProductPage() {
           description: "Your company must be approved to add products.",
           variant: "destructive",
         })
-        router.push("/company/dashboard") // Redirect if company is not approved
+        router.push("/company/dashboard")
         return
       }
 
-      // Save to store
       setCompanyStatus(companyData)
       setPageLoading(false)
     }
@@ -85,12 +82,15 @@ export default function AddProductPage() {
     checkAuthAndCompanyStatus()
   }, [router, toast, companyStatus, setCompanyStatus])
 
-  // General file upload function for Supabase Storage
+  // UPDATED: Now returns only the storage path (uniqueFileName) instead of the full URL
   const uploadFile = async (file: File, bucketName: string, folder: string) => {
     if (!companyStatus?.id) throw new Error("Company ID is missing for file upload.")
+    
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+    // This path is what will be saved to the DB
     const uniqueFileName = `${folder}/${companyStatus.id}/${sanitizedFileName}-${crypto.randomUUID()}`
-    const { data, error } = await supabase.storage.from(bucketName).upload(uniqueFileName, file, {
+    
+    const { error } = await supabase.storage.from(bucketName).upload(uniqueFileName, file, {
       cacheControl: "3600",
       upsert: false,
     })
@@ -99,15 +99,15 @@ export default function AddProductPage() {
       throw error
     }
 
-    const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(uniqueFileName)
-    return publicUrlData.publicUrl
+    // We simply return the path (e.g., "images/123/my-image-uuid.jpg")
+    return uniqueFileName
   }
 
   const handleSaveProduct = async (
     data: ProductFormData,
     newImages: File[],
     newVideo: File | null,
-    removedImageUrls: string[], // Not used in add mode, but kept for consistent signature
+    removedImageUrls: string[],
   ) => {
     if (!companyStatus?.id || !companyStatus?.is_approved) {
       setSubmissionError("Company not approved or ID missing. Cannot add product.")
@@ -123,17 +123,15 @@ export default function AddProductPage() {
     setSubmissionError("")
 
     try {
-      // Upload new images to Supabase Storage.
+      // These will now receive paths, not full URLs
       const uploadImagePromises = newImages.map((file) => uploadFile(file, "product-media", "images"))
-      const productPhotoUrls = await Promise.all(uploadImagePromises)
+      const productPhotoPaths = await Promise.all(uploadImagePromises)
 
-      // Upload video to Supabase Storage if selected.
-      let productVideoUrl: string | null = null
+      let productVideoPath: string | null = null
       if (newVideo) {
-        productVideoUrl = await uploadFile(newVideo, "product-media", "videos")
+        productVideoPath = await uploadFile(newVideo, "product-media", "videos")
       }
 
-      // Prepare product data for Supabase.
       const productData = {
         company_id: companyStatus.id,
         product_name: data.productName,
@@ -149,12 +147,12 @@ export default function AddProductPage() {
         dimension_unit: data.dimensionUnit,
         nutrients: data.nutrients,
         categories: data.categories,
-        product_photo_urls: productPhotoUrls,
-        product_video_url: productVideoUrl,
-        is_approved: false, // Default to false
+        // Saving paths only
+        product_photo_urls: productPhotoPaths, 
+        product_video_url: productVideoPath,
+        is_approved: false,
       }
 
-      // Insert product data into Supabase.
       const { error: dbError } = await supabase.from("products").insert([productData])
 
       if (dbError) {
@@ -166,8 +164,8 @@ export default function AddProductPage() {
         description: "Product added successfully. It is pending approval.",
         variant: "default",
       })
-      clearAddProductFormState() // Clear saved form state
-      router.push("/company/dashboard/my-products") // Redirect to my products page
+      clearAddProductFormState()
+      router.push("/company/dashboard/my-products")
     } catch (error: any) {
       console.error("Error adding product:", error)
       setSubmissionError(error.message || "Error adding product. Please try again.")
@@ -201,7 +199,6 @@ export default function AddProductPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100">
-      {/* Professional Top Navbar */}
       <nav className="w-full h-16 px-6 flex items-center bg-gradient-to-r from-blue-100 via-green-50 to-green-100 shadow-sm rounded-b-2xl mb-8 font-[Inter,sans-serif]">
         <div className="flex items-center gap-3">
           <PlusCircle className="h-7 w-7 text-green-500" />

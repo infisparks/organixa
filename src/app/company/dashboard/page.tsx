@@ -9,6 +9,27 @@ import { Button } from "@/components/ui/button"
 import Chart from "react-apexcharts"
 import Image from "next/image"
 import { useDashboardStore } from "@/store/useDashboardStore"
+import { supabase } from "@/lib/supabase" // Import supabase to use in getPublicUrlFromPath
+
+/**
+ * Helper function to reconstruct the public URL from the stored path.
+ * The paths are stored in the 'product-media' bucket.
+ * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
+ * @returns The full public URL string.
+ */
+const getPublicUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    // Use the getPublicUrl method which correctly constructs the URL using the project config
+    const { data } = supabase.storage
+        .from("product-media")
+        .getPublicUrl(path);
+
+    // If data.publicUrl exists, return it, otherwise return a placeholder
+    return data.publicUrl || "/placeholder.svg";
+};
+
 
 export default function DashboardPage() {
     const { stats, loading, error, fetchStats } = useDashboardStore()
@@ -85,8 +106,6 @@ export default function DashboardPage() {
                             <p className="text-xs text-blue-600">Orders with your products</p>
                         </CardContent>
                     </Card>
-
-                    {/* This was the location of the removed Pending Orders Card */}
 
                     <Card className="rounded-2xl shadow-xl border-0 bg-gradient-to-br from-green-100 via-green-200 to-green-50 hover:scale-105 transition-transform duration-200">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -216,7 +235,8 @@ export default function DashboardPage() {
                                             <div className="flex items-center gap-3">
                                                 <div className="relative w-10 h-10 flex-shrink-0 rounded-md overflow-hidden border border-gray-200">
                                                     <Image
-                                                        src={product.product_photo_urls?.[0] || "/placeholder.svg"}
+                                                        // FIX APPLIED HERE: Use the helper function to get the public URL
+                                                        src={getPublicUrlFromPath(product.product_photo_urls?.[0])}
                                                         alt={product.product_name}
                                                         className="object-cover w-full h-full"
                                                         width={40}
@@ -275,7 +295,8 @@ export default function DashboardPage() {
                                                         <div className="flex-shrink-0 h-10 w-10 rounded-md overflow-hidden border border-gray-200">
                                                             <img
                                                                 className="h-10 w-10 object-cover"
-                                                                src={product.product_photo_urls?.[0] || "/placeholder.svg"}
+                                                                // FIX APPLIED HERE: Use the helper function to get the public URL
+                                                                src={getPublicUrlFromPath(product.product_photo_urls?.[0])}
                                                                 alt={product.product_name}
                                                             />
                                                         </div>

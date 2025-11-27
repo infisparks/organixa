@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Edit, Eye, PackageX, AlertCircle, Camera, Package } from "lucide-react"
+import { Loader2, Edit, PackageX, AlertCircle, Camera, Package } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -21,6 +21,26 @@ interface Product {
   is_approved: boolean
   created_at: string
 }
+
+/**
+ * Helper function to reconstruct the public URL from the stored path.
+ * The paths are stored in the 'product-media' bucket.
+ * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
+ * @returns The full public URL string.
+ */
+const getPublicUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    // Use the getPublicUrl method which correctly constructs the URL using the project config
+    const { data } = supabase.storage
+        .from("product-media")
+        .getPublicUrl(path);
+
+    // If data.publicUrl exists, return it, otherwise return a placeholder
+    return data.publicUrl || "/placeholder.svg";
+};
+
 
 export default function MyProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -80,6 +100,8 @@ export default function MyProductsPage() {
     fetchProducts()
   }, [toast])
 
+  // --- Rendering Logic (Unchanged except for the image source) ---
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -136,7 +158,8 @@ export default function MyProductsPage() {
                 <div className="aspect-square rounded-md overflow-hidden bg-gray-100 mb-4 border border-gray-200">
                   {product.product_photo_urls && product.product_photo_urls.length > 0 ? (
                     <img
-                      src={product.product_photo_urls[0] || "/placeholder.svg"}
+                      // FIX APPLIED HERE: Use the helper function to get the full public URL
+                      src={getPublicUrlFromPath(product.product_photo_urls[0])}
                       alt={product.product_name}
                       className="w-full h-full object-cover"
                       crossOrigin="anonymous"
@@ -175,16 +198,6 @@ export default function MyProductsPage() {
                         <Edit className="h-4 w-4 mr-2" /> Edit
                       </Link>
                     </Button>
-                    {/* <Button
-                      variant="secondary"
-                      size="sm"
-                      asChild
-                      className="bg-gradient-to-r from-pink-500 to-purple-400 text-white font-semibold border-0 rounded-lg shadow-md hover:scale-105 hover:from-purple-400 hover:to-pink-500 transition-transform duration-200"
-                    >
-                      <Link href={`/product/${product.id}`}>
-                        <Eye className="h-4 w-4 mr-2" /> View
-                      </Link>
-                    </Button> */}
                   </div>
                 </div>
               </CardContent>
