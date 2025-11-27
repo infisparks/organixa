@@ -16,6 +16,27 @@ import { supabase } from "@/lib/supabase"
 import AuthPopup from "@/components/auth-popup"
 import { useRouter } from "next/navigation"
 
+// --- Helper function for image path resolution (MOVED HERE) ---
+/**
+ * Helper function to reconstruct the public URL from the stored path.
+ * The paths are stored in the 'product-media' bucket.
+ * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
+ * @returns The full public URL string.
+ */
+const getPublicUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    // Use the getPublicUrl method which correctly constructs the URL using the project config
+    const { data } = supabase.storage
+        .from("product-media")
+        .getPublicUrl(path);
+
+    // If data.publicUrl exists, return it, otherwise return a placeholder
+    return data.publicUrl || "/placeholder.svg";
+};
+
+
 // Product type definition
 type Product = {
   id: string
@@ -26,7 +47,7 @@ type Product = {
   categories?: Array<{ main: string; sub: string }>
   company: {
     company_name: string
-    company_logo_url: string
+    company_logo_url: string // This might also need path conversion if stored as path
   } | null
   is_featured?: boolean
   is_best_seller?: boolean
@@ -242,7 +263,8 @@ function ProductCard({ product }: { product: Product }) {
       {/* Image Section - Compact Aspect Ratio */}
       <div className="relative aspect-[3/4] sm:aspect-[3/4] overflow-hidden bg-gray-50">
         <Image
-          src={product.product_photo_urls?.[0] || "/placeholder.svg"}
+          // FIX APPLIED HERE: Use the helper function to get the full public URL
+          src={getPublicUrlFromPath(product.product_photo_urls?.[0])}
           alt={product.product_name}
           fill
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
@@ -285,6 +307,8 @@ function ProductCard({ product }: { product: Product }) {
         {product.company && (
           <div className="flex items-center gap-2 mb-2">
             <Image
+              // Assuming company_logo_url is NOT stored as a path and still returns a full URL. 
+              // If company logos are also stored as paths, this needs the helper function too.
               src={product.company.company_logo_url || "/placeholder.svg"}
               alt={product.company.company_name || "Brand"}
               width={20}
@@ -386,8 +410,6 @@ export default function Home() {
     { id: 3, title: "Health & Wellness Products", subtitle: "Boost Wellbeing", icon: "🌿", image: "" },
     { id: 4, title: "Sustainable Home & Eco-Friendly Living", subtitle: "Green Living", icon: "♻️", image: "" },
     { id: 5, title: "Sustainable Fashion & Accessories", subtitle: "Eco-Chic Styles", icon: "👕", image: "" },
-    // { id: 6, title: "Organic Baby & Kids Care", subtitle: "For Little Ones", icon: "👶", image: "" },
-    // { id: 7, title: "Organic Pet Care", subtitle: "For Your Pets", icon: "🐾", image: "" },
     { id: 8, title: "Special Dietary & Lifestyle Products", subtitle: "For Your Lifestyle", icon: "🥗", image: "" },
   ]
 
