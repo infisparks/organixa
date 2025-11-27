@@ -386,8 +386,8 @@ export default function Home() {
     { id: 3, title: "Health & Wellness Products", subtitle: "Boost Wellbeing", icon: "🌿", image: "" },
     { id: 4, title: "Sustainable Home & Eco-Friendly Living", subtitle: "Green Living", icon: "♻️", image: "" },
     { id: 5, title: "Sustainable Fashion & Accessories", subtitle: "Eco-Chic Styles", icon: "👕", image: "" },
-    { id: 6, title: "Organic Baby & Kids Care", subtitle: "For Little Ones", icon: "👶", image: "" },
-    { id: 7, title: "Organic Pet Care", subtitle: "For Your Pets", icon: "🐾", image: "" },
+    // { id: 6, title: "Organic Baby & Kids Care", subtitle: "For Little Ones", icon: "👶", image: "" },
+    // { id: 7, title: "Organic Pet Care", subtitle: "For Your Pets", icon: "🐾", image: "" },
     { id: 8, title: "Special Dietary & Lifestyle Products", subtitle: "For Your Lifestyle", icon: "🥗", image: "" },
   ]
 

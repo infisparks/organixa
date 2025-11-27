@@ -646,7 +646,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
         <RazorpayPayment
           amount={totalAmount}
           name={userName || "Customer"}
-          description={`Order from Organixa`}
+          description={`Order from organicza`}
           image="/placeholder.svg" // Use a generic logo or company logo
           prefill={{
             name: userName || undefined,

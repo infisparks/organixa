@@ -12,7 +12,7 @@ export default function Footer() {
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2 text-white">
               <Leaf className="h-8 w-8 text-green-500" />
-              <span className="text-2xl font-bold">Organixa</span>
+              <span className="text-2xl font-bold">organicza</span>
             </Link>
             <p className="text-sm leading-relaxed">
               Your trusted source for premium organic products, delivered fresh to your door.
@@ -110,8 +110,8 @@ export default function Footer() {
               </p>
               <p className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-green-500" />
-                <a href="mailto:info@organixa.com" className="hover:text-white transition-colors">
-                  info@organixa.com
+                <a href="mailto:info@organicza.com" className="hover:text-white transition-colors">
+                  info@organicza.com
                 </a>
               </p>
             </address>
@@ -119,7 +119,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-700 mt-10 pt-8 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} Organixa. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} organicza. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -329,7 +329,7 @@ export default function AuthPopup({
         <DialogHeader className="text-center">
           <DialogTitle className="text-2xl font-bold">
             {currentMode === "auth"
-              ? "Welcome to Organixa"
+              ? "Welcome to organicza"
               : "Complete Your Profile"}
           </DialogTitle>
           <DialogDescription className="text-gray-600">
