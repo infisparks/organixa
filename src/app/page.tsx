@@ -10,13 +10,17 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 // RESTORING EXTERNAL COMPONENT IMPORTS
-import Header from "@/components/Header" // Assuming Header component is back
-import Footer from "@/components/Footer" // Assuming Footer component is back
+import Header from "@/components/Header"
+import Footer from "@/components/Footer"
 import { supabase } from "@/lib/supabase"
 import AuthPopup from "@/components/auth-popup"
 import { useRouter } from "next/navigation"
 
-// --- Helper function for image path resolution (MOVED HERE) ---
+// =========================================================================
+//                             HELPER FUNCTIONS
+// =========================================================================
+
+// --- 1. Helper function for Product Image path resolution (product-media bucket) ---
 /**
  * Helper function to reconstruct the public URL from the stored path.
  * The paths are stored in the 'product-media' bucket.
@@ -27,15 +31,57 @@ const getPublicUrlFromPath = (path: string | undefined): string => {
     if (!path) {
         return "/placeholder.svg"; // Default placeholder if path is missing
     }
-    // Use the getPublicUrl method which correctly constructs the URL using the project config
     const { data } = supabase.storage
         .from("product-media")
         .getPublicUrl(path);
 
-    // If data.publicUrl exists, return it, otherwise return a placeholder
     return data.publicUrl || "/placeholder.svg";
 };
 
+// --- 2. Helper function for Company Logo path resolution (company-documents bucket) ---
+/**
+ * Helper function to reconstruct the public URL from the stored path.
+ * The paths are stored in the 'company-documents' bucket.
+ * @param path The relative path stored in the database (e.g., 'logos/123/file.webp')
+ * @returns The full public URL string.
+ */
+const getCompanyLogoUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    const { data } = supabase.storage
+        .from("company-documents")
+        .getPublicUrl(path);
+
+    return data.publicUrl || "/placeholder.svg";
+};
+
+// --- 3. Product Skeleton (DEFINED ONLY ONCE) ---
+function ProductSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+      <div className="aspect-[3/4] sm:aspect-[3/4] bg-gray-200" />
+      <div className="p-3 sm:p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-200" />
+          <div className="h-3 bg-gray-200 rounded w-20" />
+        </div>
+        <div className="h-4 bg-gray-200 rounded w-full mb-3" /> 
+        <div className="flex gap-1 mb-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="w-3.5 h-3.5 bg-gray-200 rounded" />
+          ))}
+        </div>
+        <div className="h-6 bg-gray-200 rounded w-24 mb-3" />
+        <div className="h-8 bg-gray-200 rounded-lg mt-auto" />
+      </div>
+    </div>
+  )
+}
+
+// =========================================================================
+//                             TYPE DEFINITIONS
+// =========================================================================
 
 // Product type definition
 type Product = {
@@ -47,7 +93,7 @@ type Product = {
   categories?: Array<{ main: string; sub: string }>
   company: {
     company_name: string
-    company_logo_url: string // This might also need path conversion if stored as path
+    company_logo_url: string
   } | null
   is_featured?: boolean
   is_best_seller?: boolean
@@ -61,6 +107,10 @@ type CategoryProps = {
   selectedCategory: string | null
   onCategoryClick: (category: string) => void
 }
+
+// =========================================================================
+//                             COMPONENTS
+// =========================================================================
 
 // Enhanced Category Carousel with better mobile UX (Scrollable)
 function CategoryCarousel({ categories, selectedCategory, onCategoryClick }: CategoryProps) {
@@ -263,7 +313,7 @@ function ProductCard({ product }: { product: Product }) {
       {/* Image Section - Compact Aspect Ratio */}
       <div className="relative aspect-[3/4] sm:aspect-[3/4] overflow-hidden bg-gray-50">
         <Image
-          // FIX APPLIED HERE: Use the helper function to get the full public URL
+          // Use the product image helper
           src={getPublicUrlFromPath(product.product_photo_urls?.[0])}
           alt={product.product_name}
           fill
@@ -307,9 +357,8 @@ function ProductCard({ product }: { product: Product }) {
         {product.company && (
           <div className="flex items-center gap-2 mb-2">
             <Image
-              // Assuming company_logo_url is NOT stored as a path and still returns a full URL. 
-              // If company logos are also stored as paths, this needs the helper function too.
-              src={product.company.company_logo_url || "/placeholder.svg"}
+              // Use the company logo helper
+              src={getCompanyLogoUrlFromPath(product.company.company_logo_url) || "/placeholder.svg"}
               alt={product.company.company_name || "Brand"}
               width={20}
               height={20}
@@ -326,7 +375,7 @@ function ProductCard({ product }: { product: Product }) {
           {product.product_name}
         </h3>
 
-        {/* Rating */}
+        {/* Rating Section */}
         <div className="flex items-center gap-2 mb-3">
           <div className="flex items-center gap-0.5">
             {[...Array(5)].map((_, i) => (
@@ -369,28 +418,6 @@ function ProductCard({ product }: { product: Product }) {
   )
 }
 
-// Enhanced Product Skeleton - Compacted
-function ProductSkeleton() {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
-      <div className="aspect-[3/4] sm:aspect-[3/4] bg-gray-200" />
-      <div className="p-3 sm:p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gray-200" />
-          <div className="h-3 bg-gray-200 rounded w-20" />
-        </div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-3" /> 
-        <div className="flex gap-1 mb-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-3.5 h-3.5 bg-gray-200 rounded" />
-          ))}
-        </div>
-        <div className="h-6 bg-gray-200 rounded w-24 mb-3" />
-        <div className="h-8 bg-gray-200 rounded-lg mt-auto" />
-      </div>
-    </div>
-  )
-}
 
 // Main Component (Home)
 export default function Home() {

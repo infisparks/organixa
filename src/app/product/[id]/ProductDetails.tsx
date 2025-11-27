@@ -30,7 +30,46 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-// ... (ProductDetailsProps and Address types remain the same)
+// --- Helper function for Product Image path resolution ---
+/**
+ * Helper function to reconstruct the public URL from the stored path (product-media bucket).
+ * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
+ * @returns The full public URL string.
+ */
+const getPublicUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    // Targets the 'product-media' bucket
+    const { data } = supabase.storage
+        .from("product-media") 
+        .getPublicUrl(path);
+
+    if (data.publicUrl) return data.publicUrl;
+    return "/placeholder.svg";
+};
+
+// --- NEW Helper function for Company Logo path resolution ---
+/**
+ * Helper function to reconstruct the public URL from the stored path (company-documents bucket).
+ * @param path The relative path stored in the database (e.g., 'logos/123/file.webp')
+ * @returns The full public URL string.
+ */
+const getCompanyLogoUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    // Targets the 'company-documents' bucket
+    const { data } = supabase.storage
+        .from("company-documents")
+        .getPublicUrl(path);
+
+    if (data.publicUrl) return data.publicUrl;
+    return "/placeholder.svg";
+};
+
+
+// Product type definition
 type ProductDetailsProps = {
   product: {
     id: string
@@ -38,11 +77,11 @@ type ProductDetailsProps = {
     productDescription: string
     originalPrice: number
     discountPrice?: number
-    productPhotoUrls?: string[]
-    productVideoUrl?: string
+    productPhotoUrls?: string[] // These are paths now
+    productVideoUrl?: string // This is a path now
     company: {
       name: string
-      logo: string
+      logo: string // This is a path now (e.g., logos/...)
     }
     nutrients?: {
       name: string
@@ -58,12 +97,10 @@ type Address = {
   [key: string]: any
 }
 
-// --- 🎯 REMOVED: The hard-coded URL const is no longer needed here ---
-
 export default function ProductDetails({ product }: ProductDetailsProps) {
   const { toast } = useToast()
   const router = useRouter()
-  // ... (All other state variables are the same)
+  
   const [quantity, setQuantity] = useState(1)
   const [showAuthPopup, setShowAuthPopup] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -82,10 +119,16 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const [isCheckingDelivery, setIsCheckingDelivery] = useState(false)
 
   const displayPrice = product.discountPrice ?? product.originalPrice
-  const [selectedImage, setSelectedImage] = useState(product.productPhotoUrls?.[0] ?? "")
+  
+  // --- IMAGE RESOLUTION AT THE START ---
   const images = product.productPhotoUrls ?? []
+  const resolvedImages = images.map(getPublicUrlFromPath).filter(url => url !== "/placeholder.svg");
 
-  // ... (The first useEffect for fetchUserData is identical, no changes)
+  // State for the main image must use the resolved URL
+  const [selectedImage, setSelectedImage] = useState(resolvedImages?.[0] ?? "/placeholder.svg")
+  // --- END IMAGE RESOLUTION ---
+
+
   useEffect(() => {
     const fetchUserData = async () => {
       const {
@@ -191,32 +234,23 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   }, [product.id, toast])
 
-  // --- 🎯 UPDATED useEffect TO CHECK DELIVERY (INSECURE) ---
+  // --- UPDATED useEffect TO CHECK DELIVERY (INSECURE) ---
   useEffect(() => {
     const checkDeliverability = async (pincode: string) => {
       setIsCheckingDelivery(true)
       setIsDeliverable(null)
 
-      // ⚠️ DANGEROUS: Keys are exposed to the public here.
-      // --- 🎯 ALL ENV VARS ARE NOW READ HERE ---
       const accessToken = process.env.NEXT_PUBLIC_ITHINK_ACCESS_TOKEN;
       const secretKey = process.env.NEXT_PUBLIC_ITHINK_SECRET_KEY;
       const ITHINK_API_URL = process.env.NEXT_PUBLIC_ITHINK_API_URL;
 
-      // --- 🎯 UPDATED CHECK to include the URL ---
-      // if (!accessToken || !secretKey || !ITHINK_API_URL) {
-      //   console.error("Missing iThink Logistics API credentials or URL in .env.local");
-      //   toast({
-      //     title: "Configuration Error",
-      //     description: "Delivery check is not configured.",
-      //     variant: "destructive",
-      //   });
-      //   setIsCheckingDelivery(false);
-      //   return; // Stop if keys or URL are missing
-      // }
+      if (!accessToken || !secretKey || !ITHINK_API_URL) {
+        setIsCheckingDelivery(false);
+        return; 
+      }
 
       try {
-        const apiResponse = await fetch(ITHINK_API_URL, { // Uses the var from .env
+        const apiResponse = await fetch(ITHINK_API_URL, { 
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -242,13 +276,11 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         if (data.status === "success" && data.data && data.data[pincode]) {
           const carriers = data.data[pincode];
           
-          // --- SAFER, MORE ROBUST LOGIC ---
           const isDeliverable = Object.values(carriers).some(
             (carrier: any) => 
               (typeof carrier === 'object' && carrier !== null) && 
               (carrier.prepaid === "Y" || carrier.cod === "Y")
           );
-          // --- END OF SAFER LOGIC ---
           
           setIsDeliverable(isDeliverable);
 
@@ -282,10 +314,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   }, [userPincode, currentUserId, toast])
   // --- END OF UPDATED SECTION ---
 
-
-  // ... (fetchReviews, toggleFavorite, handleAddToCart, handleRemoveFromCart, 
-  //      handleDirectBuy, handleAuthSuccess, updateQuantity, handleReviewSubmit, 
-  //      handleOrderSuccess... ALL THESE FUNCTIONS ARE UNCHANGED) ...
 
   const reviewCount = reviews.length
   const averageRating =
@@ -498,7 +526,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   }
 
 
-  // ... (useEffect for fetchReviews is also unchanged)
   useEffect(() => {
     const fetchReviews = async () => {
       const { data, error } = await supabase
@@ -546,8 +573,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     (!!currentUserId && userPincode && isDeliverable === false);
 
   // --- JSX (RETURN) ---
-  // This is all identical to the previous version. The new delivery
-  // status UI and the 'disabled' prop on the buttons are already correct.
   return (
     <div className="bg-white">
       <nav className="hidden sm:flex items-center text-sm text-gray-500 px-4 sm:px-6 lg:px-8 ">
@@ -581,7 +606,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             </div>
             {/* Image Gallery */}
             <div className="grid grid-cols-4 gap-3">
-              {images.map((imgUrl, i) => (
+              {resolvedImages.map((imgUrl, i) => ( // Use resolvedImages array
                 <button
                   key={i}
                   onClick={() => setSelectedImage(imgUrl)}
@@ -603,7 +628,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
               {product.productVideoUrl && (
                 <button
                   onClick={() => {
-                    window.open(product.productVideoUrl, "_blank")
+                    // FIX APPLIED: Use the resolved video URL
+                    window.open(getPublicUrlFromPath(product.productVideoUrl), "_blank")
                   }}
                   className="relative aspect-square rounded-lg overflow-hidden border-2 transition-all border-transparent hover:border-gray-300 flex items-center justify-center bg-gray-100"
                 >
@@ -618,7 +644,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <div className="flex items-center gap-4 mb-6">
               <div className="relative h-12 w-12 overflow-hidden rounded-full border border-gray-200">
                 <Image
-                  src={product.company.logo || "/placeholder.svg"}
+                  // FIX APPLIED: Resolve company logo URL using the specific helper
+                  src={getCompanyLogoUrlFromPath(product.company.logo) || "/placeholder.svg"}
                   alt={product.company.name}
                   fill
                   className="object-cover"
