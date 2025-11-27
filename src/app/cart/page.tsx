@@ -9,10 +9,39 @@ import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Minus, Plus, Trash2, PackageX } from "lucide-react"
+import { Loader2, Minus, Plus, Trash2, PackageX, ShoppingCart, Truck, Check } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
 import CheckoutDetailsModal from "@/components/checkout-details-modal"
+
+// =========================================================================
+//                             HELPER FUNCTIONS (FIXED)
+// =========================================================================
+
+/**
+ * Helper function to reconstruct the public URL from the stored path (product-media bucket).
+ * FIX APPLIED: Uses decodeURIComponent to prevent double-encoding of special characters.
+ * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
+ * @returns The full public URL string.
+ */
+const getPublicUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    // FIX: Decode the path to handle pre-encoded characters
+    const decodedPath = decodeURIComponent(path); 
+
+    const { data } = supabase.storage
+        .from("product-media") 
+        .getPublicUrl(decodedPath);
+
+    return data.publicUrl || "/placeholder.svg";
+};
+
+
+// =========================================================================
+//                             COMPONENT START
+// =========================================================================
 
 // ✅ UPDATED CartItem interface to make product fields optional since 'products' can be null
 interface CartItem {
@@ -241,16 +270,17 @@ export default function CartPage() {
       const { error } = await supabase.from("cart_items").delete().eq("user_id", userId)
       if (!error) setCartItems([])
     }
+    setShowCheckoutModal(false);
     router.push("/orders")
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-gray-50">
         <Header showSearchBar={true} onSearch={setSearchTerm} />
         <main className="flex-grow container mx-auto px-4 py-8 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-3 text-lg text-blue-700">Loading cart...</span>
+          <Loader2 className="h-10 w-10 animate-spin text-green-600" />
+          <span className="ml-3 text-xl text-green-700">Fetching your cart contents...</span>
         </main>
         <Footer />
       </div>
@@ -259,11 +289,11 @@ export default function CartPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-gray-50">
         <Header showSearchBar={true} onSearch={setSearchTerm} />
         <main className="flex-grow container mx-auto px-4 py-8">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <strong className="font-bold">Error!</strong>
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative shadow-md" role="alert">
+            <strong className="font-bold">Cart Error:</strong>
             <span className="block sm:inline"> {error}</span>
           </div>
         </main>
@@ -273,23 +303,30 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <Header showSearchBar={true} onSearch={setSearchTerm} />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900">Your Shopping Cart</h1>
+      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <h1 className="text-3xl sm:text-4xl font-extrabold mb-8 text-gray-900 tracking-tight">
+          Your Shopping Cart ({filteredCartItems.length})
+        </h1>
 
         {filteredCartItems.length === 0 && cartItems.length > 0 && searchTerm !== "" ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-            <p className="text-xl font-medium mb-2">No results found for {searchTerm}</p>
-            <p className="text-md mb-6">Try a different search term or clear the search bar.</p>
-            <Button onClick={() => setSearchTerm("")}>Clear Search</Button>
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-lg border border-gray-200">
+            <ShoppingCart className="w-20 h-20 mb-4 text-gray-300" />
+            <p className="text-xl font-medium mb-2">No items match your search term.</p>
+            <p className="text-md mb-6 text-gray-500">Try a different search or clear the search bar to see all items.</p>
+            <Button onClick={() => setSearchTerm("")} className="bg-green-600 hover:bg-green-700">
+                Clear Search
+            </Button>
           </div>
         ) : filteredCartItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-            <PackageX className="w-20 h-20 mb-4 text-gray-300" />
-            <p className="text-xl font-medium mb-2">Your cart is empty!</p>
-            <p className="text-md mb-6">Looks like you haven't added anything to your cart yet.</p>
-            <Button asChild>
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-lg border border-gray-200">
+            <PackageX className="w-20 h-20 sm:w-24 sm:h-24 mb-6 text-green-300" />
+            <p className="text-xl sm:text-2xl font-semibold mb-3 text-gray-700">Your cart is empty!</p>
+            <p className="text-gray-500 mb-6 text-center max-w-md">
+              Start adding organic products to your cart.
+            </p>
+            <Button asChild className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl shadow-md transition-all">
               <Link href="/shop">Start Shopping</Link>
             </Button>
           </div>
@@ -297,112 +334,137 @@ export default function CartPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Cart Items List */}
             <div className="lg:col-span-2 space-y-4">
-              {filteredCartItems.map((item) => (
-                <Card key={item.id} className="flex flex-col sm:flex-row items-center sm:items-start p-4 shadow-sm">
-                  {/* Image Link */}
-                  <Link
-                    href={`/product/${item.product_id}`}
-                    className="relative w-24 h-24 flex-shrink-0 rounded-md overflow-hidden border mb-4 sm:mb-0"
-                  >
-                    {/* ✅ Used optional chaining with fallback */}
-                    <Image
-                      src={item.products?.product_photo_urls?.[0] || "/placeholder.svg"}
-                      alt={item.products?.product_name || "Product Image"}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 96px"
-                      className="object-cover"
-                    />
-                  </Link>
+              {filteredCartItems.map((item) => {
+                  const unitPrice = item.products?.discount_price ?? item.products?.original_price ?? item.price_at_add;
+                  const itemSubtotal = unitPrice * item.quantity;
+                  const productName = item.products?.product_name || "Unknown Product";
                   
-                  {/* Product Details & Actions */}
-                  <div className="ml-0 sm:ml-4 flex-grow flex flex-col sm:flex-row justify-between w-full sm:w-auto">
-                    
-                    {/* Name & Price Column (Aligned Left) */}
-                    <div className="flex flex-col justify-center mb-3 sm:mb-0 sm:w-3/5">
-                      <h2 className="text-lg font-semibold text-gray-900 line-clamp-2 text-center sm:text-left">
-                        <Link href={`/product/${item.product_id}`} className="hover:text-green-600 transition-colors">
-                          {item.products?.product_name || "Unknown Product"}
-                        </Link>
-                      </h2>
-                      <p className="text-gray-600 mt-1 text-center sm:text-left">
-                        {/* Display the unit price */}
-                        Unit Price: ₹
-                        {(item.products?.discount_price ?? item.products?.original_price ?? item.price_at_add).toFixed(2)}
-                      </p>
-                      {/* 🎯 DISPLAY ITEM SUBTOTAL */}
-                      <p className="text-gray-900 font-medium text-sm mt-1 text-center sm:text-left">
-                        Total: ₹{((item.products?.discount_price ?? item.products?.original_price ?? item.price_at_add) * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
-
-                    {/* Quantity & Remove Column (Aligned Right/Centered) */}
-                    <div className="flex items-center justify-center sm:justify-end sm:w-2/5 space-x-4">
-                      {/* Quantity Selector */}
-                      <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 bg-transparent"
-                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                          disabled={item.quantity <= 1}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="mx-3 text-md font-medium">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 bg-transparent"
-                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
+                  return (
+                    <Card key={item.id} className="flex flex-col sm:flex-row p-4 rounded-xl shadow-md transition-shadow hover:shadow-lg border border-gray-200 bg-white">
                       
-                      {/* Remove Button */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-600"
-                        onClick={() => handleRemoveItem(item.id, item.products?.product_name || "Item")}
+                      {/* Image Link (Fixed 96x96 size) */}
+                      <Link
+                        href={`/product/${item.product_id}`}
+                        className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border border-gray-100 mx-auto sm:mx-0 mb-4 sm:mb-0"
                       >
-                        <Trash2 className="h-5 w-5" />
-                        <span className="sr-only">Remove item</span>
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+                        {/* ✅ Use helper function for image resolution */}
+                        <Image
+                          src={getPublicUrlFromPath(item.products?.product_photo_urls?.[0])}
+                          alt={productName}
+                          fill
+                          sizes="96px"
+                          className="object-cover"
+                        />
+                      </Link>
+                      
+                      {/* Product Details & Actions */}
+                      <div className="ml-0 sm:ml-4 flex-grow flex flex-col justify-between w-full">
+                        
+                        {/* Top Row: Name, Unit Price, Total Price */}
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-start w-full">
+                          
+                          {/* Name and Unit Price */}
+                          <div className="mb-2 sm:mb-0 sm:w-3/5 text-center sm:text-left">
+                            <h2 className="text-lg font-bold text-gray-900 line-clamp-2">
+                              <Link href={`/product/${item.product_id}`} className="hover:text-green-600 transition-colors">
+                                {productName}
+                              </Link>
+                            </h2>
+                            <p className="text-gray-600 text-sm mt-1">
+                              Unit Price: ₹{unitPrice.toFixed(2)}
+                            </p>
+                          </div>
+
+                          {/* Item Subtotal (Large) */}
+                          <div className="sm:w-2/5 flex flex-col items-center sm:items-end">
+                            <p className="text-xl font-extrabold text-green-700">
+                                ₹{itemSubtotal.toFixed(2)}
+                            </p>
+                            <p className="text-xs font-medium text-gray-500">
+                                Item Subtotal
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Bottom Row: Quantity & Remove Button */}
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                          
+                          {/* Quantity Selector */}
+                          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 bg-transparent hover:bg-gray-100"
+                              onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="mx-3 text-md font-medium text-gray-900">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 bg-transparent hover:bg-gray-100"
+                              onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          {/* Remove Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:bg-red-50 hover:text-red-600 gap-1 font-medium"
+                            onClick={() => handleRemoveItem(item.id, productName)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="hidden sm:inline">Remove</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+              })}
             </div>
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <Card className="sticky top-24 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-xl">Order Summary</CardTitle>
+              <Card className="sticky top-24 shadow-2xl rounded-xl border-green-200 border-2 bg-white">
+                <CardHeader className="border-b border-gray-100 bg-green-50/50 rounded-t-xl">
+                  <CardTitle className="text-xl font-extrabold text-green-800 flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5" /> Cart Summary
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between text-gray-700">
-                    {/* 🎯 Display number of items correctly */}
+                <CardContent className="space-y-4 py-6">
+                  <div className="flex justify-between text-gray-700 text-base">
                     <span>Subtotal ({filteredCartItems.reduce((acc, item) => acc + item.quantity, 0)} items)</span>
-                    <span>₹{subtotal.toFixed(2)}</span>
+                    <span className="font-semibold">₹{subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-gray-700">
-                    <span>Shipping</span>
-                    <span>{shippingFee === 0 ? "Free" : `₹${shippingFee.toFixed(2)}`}</span>
+                  <div className="flex justify-between items-center text-gray-700 text-base">
+                    <span className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-green-600"/> Shipping
+                    </span>
+                    <span className={`font-semibold ${shippingFee === 0 ? 'text-green-600' : 'text-gray-700'}`}>
+                        {shippingFee === 0 ? <span className="font-extrabold">FREE</span> : `₹${shippingFee.toFixed(2)}`}
+                    </span>
                   </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold text-lg text-gray-900">
-                    <span>Total</span>
+                  {shippingFee !== 0 && (
+                      <p className="text-xs text-green-600 bg-green-50 p-2 rounded-lg text-center font-medium">
+                          Add ₹{(1000 - subtotal).toFixed(2)} more for free shipping!
+                      </p>
+                  )}
+                  <Separator className="bg-green-100" />
+                  <div className="flex justify-between font-extrabold text-xl text-gray-900">
+                    <span>Order Total</span>
                     <span>₹{total.toFixed(2)}</span>
                   </div>
                   <Button
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-3"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg text-lg font-bold shadow-xl transition-all hover:shadow-2xl"
                     onClick={handleProceedToCheckout}
                   >
-                    Proceed to Checkout
+                    <Check className="w-5 h-5 mr-2" /> Proceed to Checkout
                   </Button>
-                  <p className="text-center text-sm text-gray-500 mt-4">Shipping calculated at checkout.</p>
                 </CardContent>
               </Card>
             </div>
