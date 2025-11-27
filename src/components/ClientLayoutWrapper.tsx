@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import { useState, useEffect, ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import type { User } from '@supabase/supabase-js';
-import AddressFormModal from './AddressFormModal';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect, ReactNode, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
+import AddressFormModal from "./AddressFormModal";
+import { Loader2 } from "lucide-react";
 
-// --- FIX IS HERE ---
-// Added 'export' so other files can import this type
+/* ===================== TYPES ===================== */
+
 export type Address = {
   id: string;
   area: string;
@@ -24,72 +24,119 @@ export type Address = {
   secondaryPhone?: string;
 };
 
-// This matches your user_profiles table structure
 export type UserProfile = {
   id: string;
   email: string;
   name: string | null;
   created_at: string;
-  addresses: Address[]; // This is the JSONB column
+  addresses: Address[];
   phone: string | null;
 };
 
-export default function ClientLayoutWrapper({ children }: { children: ReactNode }) {
+/* ===================== COMPONENT ===================== */
+
+export default function ClientLayoutWrapper({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
   const pathname = usePathname();
+  const hasFetchedOnce = useRef(false); // ✅ prevents re-fetch on tab switch
+
+  /* ===================== PROFILE CHECK ===================== */
+
+  const checkUserAndProfile = async (silent = false) => {
+    if (!silent && !hasFetchedOnce.current) {
+      setLoading(true); // ✅ Only show loader on very first load
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      setUser(null);
+      setProfile(null);
+      setIsModalOpen(false);
+      setLoading(false);
+      hasFetchedOnce.current = true;
+      return;
+    }
+
+    setUser(session.user);
+
+    // ✅ If profile already exists, don't refetch (prevents refresh effect)
+    if (profile && silent) {
+      return;
+    }
+
+    const { data: userProfile, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single();
+
+    if (error) {
+      console.error("Profile fetch error:", error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (userProfile) {
+      const typedProfile = userProfile as UserProfile;
+      setProfile(typedProfile);
+      validateProfileCompletion(typedProfile);
+    }
+
+    hasFetchedOnce.current = true;
+    setLoading(false);
+  };
+
+  /* ===================== PROFILE VALIDATION ===================== */
+
+  const validateProfileCompletion = (profileData: UserProfile) => {
+    const hasName = profileData.name?.trim() !== "";
+    const hasPhone = profileData.phone?.trim() !== "";
+    const hasAddressWithPincode =
+      profileData.addresses?.some(
+        (addr) => addr.pincode?.trim() !== ""
+      ) || false;
+
+    const isCompanyRoute = pathname.startsWith("/company/");
+    const needsProfileCompletion =
+      !hasName || !hasPhone || !hasAddressWithPincode;
+
+    if (needsProfileCompletion && !isCompanyRoute) {
+      setIsModalOpen(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
+  /* ===================== EFFECT ===================== */
 
   useEffect(() => {
-    const checkUserAndProfile = async () => {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setUser(session.user);
-        
-        const { data: userProfile, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching user profile:", error.message);
-        }
-
-        if (userProfile) {
-          const typedProfile = userProfile as UserProfile;
-          setProfile(typedProfile);
-          
-          const hasName = typedProfile.name && typedProfile.name.trim() !== '';
-          const hasPhone = typedProfile.phone && typedProfile.phone.trim() !== '';
-          const addresses = typedProfile.addresses || [];
-          const hasAddressWithPincode = addresses.some(
-            (addr: Address) => addr.pincode && addr.pincode.trim() !== ''
-          );
-          
-          const isCompanyRoute = pathname.startsWith('/company/');
-          const needsProfileCompletion = !hasName || !hasPhone || !hasAddressWithPincode;
-          
-          if (needsProfileCompletion && !isCompanyRoute) {
-            setIsModalOpen(true);
-          }
-        }
-      }
-      setLoading(false);
-    };
-
-    checkUserAndProfile();
+    // ✅ Initial load only once
+    if (!hasFetchedOnce.current) {
+      checkUserAndProfile();
+    } else {
+      // ✅ Silent background re-check on route change
+      checkUserAndProfile(true);
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_IN') {
+      (event) => {
+        if (event === "SIGNED_IN") {
+          hasFetchedOnce.current = false;
           checkUserAndProfile();
         }
-        if (event === 'SIGNED_OUT') {
+
+        if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
           setIsModalOpen(false);
@@ -102,21 +149,16 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
     };
   }, [pathname]);
 
+  /* ===================== ADDRESS UPDATE ===================== */
+
   const handleAddressUpdated = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
-    
-    const hasName = updatedProfile.name && updatedProfile.name.trim() !== '';
-    const hasPhone = updatedProfile.phone && updatedProfile.phone.trim() !== '';
-    const addresses = updatedProfile.addresses || [];
-    const hasAddressWithPincode = addresses.some(
-      (addr: Address) => addr.pincode && addr.pincode.trim() !== ''
-    );
-    
-    const needsProfileCompletion = !hasName || !hasPhone || !hasAddressWithPincode;
-    setIsModalOpen(needsProfileCompletion);
+    validateProfileCompletion(updatedProfile);
   };
 
-  if (loading) {
+  /* ===================== LOADER (FIRST LOAD ONLY) ===================== */
+
+  if (loading && !hasFetchedOnce.current) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
@@ -124,9 +166,12 @@ export default function ClientLayoutWrapper({ children }: { children: ReactNode 
     );
   }
 
+  /* ===================== RENDER ===================== */
+
   return (
     <>
       {children}
+
       {profile && (
         <AddressFormModal
           isOpen={isModalOpen}

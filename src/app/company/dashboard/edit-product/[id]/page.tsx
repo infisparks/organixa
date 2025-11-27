@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import { AlertCircle, ArrowLeft, Loader2, Edit } from "lucide-react"
+import { AlertCircle, Edit, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -32,7 +32,9 @@ interface ProductDataFromDB {
 
 export default function EditProductPage() {
   const router = useRouter()
-  const { id } = useParams() // Get product ID from URL
+  const params = useParams()
+  // Safely extract ID and ensure it is a string
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id 
   const { toast } = useToast()
 
   const [initialProductData, setInitialProductData] = useState<ProductFormData | undefined>(undefined)
@@ -41,97 +43,117 @@ export default function EditProductPage() {
   const [submissionError, setSubmissionError] = useState("")
   const [isSaving, setIsSaving] = useState(false)
 
+  // Tracker to prevent duplicate fetching on tab switches
+  const lastFetchedId = useRef<string | null>(null)
+
   useEffect(() => {
+    // 1. Validation: Ensure ID exists
     if (!id) {
       setFetchError("Product ID is missing.")
       setPageLoading(false)
       return
     }
 
+    // 2. Optimization: If we already fetched this ID, stop here to prevent API hits on tab switch
+    if (lastFetchedId.current === id) {
+      return
+    }
+
     const fetchProductAndAuth = async () => {
+      // Mark this ID as fetched immediately to block subsequent triggers
+      lastFetchedId.current = id
+      
       setPageLoading(true)
       setFetchError(null)
 
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
 
-      if (sessionError || !session) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to edit products.",
-          variant: "destructive",
-        })
-        router.push("/login")
-        return
-      }
-
-      const userId = session.user.id
-
-      // First, get the company_id for the logged-in user
-      const { data: companyData, error: companyError } = await supabase
-        .from("companies")
-        .select("id, is_approved")
-        .eq("user_id", userId)
-        .single()
-
-      if (companyError || !companyData) {
-        console.error("Error fetching company data:", companyError)
-        setFetchError("Company record not found or not approved for this user.")
-        setPageLoading(false)
-        return
-      }
-
-      if (!companyData.is_approved) {
-        toast({
-          title: "Approval Pending",
-          description: "Your company must be approved to edit products.",
-          variant: "destructive",
-        })
-        router.push("/company/dashboard")
-        setPageLoading(false)
-        return
-      }
-
-      const companyId = companyData.id
-
-      // Fetch the specific product, ensuring it belongs to the current company
-      const { data: productData, error: productError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .eq("company_id", companyId) // Crucial for security: only allow editing own products
-        .single()
-
-      if (productError || !productData) {
-        console.error("Error fetching product:", productError)
-        setFetchError("Product not found or you don't have permission to edit it.")
-      } else {
-        // Map fetched data to ProductFormData
-        const mappedData: ProductFormData = {
-          productName: productData.product_name,
-          productDescription: productData.product_description,
-          originalPrice: productData.original_price.toString(),
-          discountPrice: productData.discount_price.toString(),
-          stockQuantity: productData.stock_quantity.toString(),
-          weight: productData.weight.toString(),
-          weightUnit: productData.weight_unit,
-          length: productData.length.toString(),
-          width: productData.width.toString(),
-          height: productData.height.toString(),
-          dimensionUnit: productData.dimension_unit,
-          nutrients: productData.nutrients || [],
-          categories: productData.categories || [],
-          existingProductPhotoUrls: productData.product_photo_urls || [],
-          existingProductVideoUrl: productData.product_video_url || null,
+        if (sessionError || !session) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to edit products.",
+            variant: "destructive",
+          })
+          router.push("/login")
+          return
         }
-        setInitialProductData(mappedData)
+
+        const userId = session.user.id
+
+        // First, get the company_id for the logged-in user
+        const { data: companyData, error: companyError } = await supabase
+          .from("companies")
+          .select("id, is_approved")
+          .eq("user_id", userId)
+          .single()
+
+        if (companyError || !companyData) {
+          console.error("Error fetching company data:", companyError)
+          setFetchError("Company record not found or not approved for this user.")
+          setPageLoading(false)
+          return
+        }
+
+        if (!companyData.is_approved) {
+          toast({
+            title: "Approval Pending",
+            description: "Your company must be approved to edit products.",
+            variant: "destructive",
+          })
+          router.push("/company/dashboard")
+          setPageLoading(false)
+          return
+        }
+
+        const companyId = companyData.id
+
+        // Fetch the specific product, ensuring it belongs to the current company
+        const { data: productData, error: productError } = await supabase
+          .from("products")
+          .select("*")
+          .eq("id", id)
+          .eq("company_id", companyId) // Crucial for security: only allow editing own products
+          .single()
+
+        if (productError || !productData) {
+          console.error("Error fetching product:", productError)
+          setFetchError("Product not found or you don't have permission to edit it.")
+        } else {
+          // Map fetched data to ProductFormData
+          const mappedData: ProductFormData = {
+            productName: productData.product_name,
+            productDescription: productData.product_description,
+            originalPrice: productData.original_price.toString(),
+            discountPrice: productData.discount_price.toString(),
+            stockQuantity: productData.stock_quantity.toString(),
+            weight: productData.weight.toString(),
+            weightUnit: productData.weight_unit,
+            length: productData.length.toString(),
+            width: productData.width.toString(),
+            height: productData.height.toString(),
+            dimensionUnit: productData.dimension_unit,
+            nutrients: productData.nutrients || [],
+            categories: productData.categories || [],
+            existingProductPhotoUrls: productData.product_photo_urls || [],
+            existingProductVideoUrl: productData.product_video_url || null,
+          }
+          setInitialProductData(mappedData)
+        }
+      } catch (error) {
+        console.error("Unexpected error:", error)
+        setFetchError("An unexpected error occurred.")
+      } finally {
+        setPageLoading(false)
       }
-      setPageLoading(false)
     }
 
     fetchProductAndAuth()
+    
+    // Minimal dependency array to prevent re-runs on unrelated state changes
   }, [id, router, toast])
 
   // General file upload function for Supabase Storage
@@ -232,8 +254,6 @@ export default function EditProductPage() {
         categories: data.categories,
         product_photo_urls: finalProductPhotoUrls,
         product_video_url: finalProductVideoUrl,
-        // is_approved status should generally not be changed by the company user
-        // is_approved: false, // Keep current status or set to pending if major changes
       }
 
       // Update product data in Supabase.
@@ -252,7 +272,9 @@ export default function EditProductPage() {
         description: "Product updated successfully.",
         variant: "default",
       })
-      router.push("/company/dashboard/my-products") // Redirect to my products page
+      
+      // OPTIONAL: Instead of pushing to a new route, just update local state or router.refresh()
+      router.push("/company/dashboard/my-products") 
     } catch (error: any) {
       console.error("Error updating product:", error)
       setSubmissionError(error.message || "Error updating product. Please try again.")

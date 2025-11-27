@@ -1,218 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { useEffect } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Loader2, Package, DollarSign, ShoppingCart, Clock, ListChecks, AlertTriangle, ShoppingBag, ShoppingBasket } from "lucide-react" 
+import { Loader2, Package, DollarSign, ShoppingCart, ListChecks, AlertTriangle, ShoppingBag, ShoppingBasket } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import Chart from "react-apexcharts"
-import Image from "next/image" 
-
-interface DashboardStats {
-    companyName: string
-    totalProducts: number
-    totalSalesAmount: number
-    totalOrders: number
-    pendingOrders: number
-    activeListings: number
-    outOfStockProducts: number
-    lowStockProducts: Array<{
-        id: string
-        product_name: string
-        stock_quantity: number
-        product_photo_urls: string[]
-    }>
-    allSellingProducts: Array<{ 
-        product_id: string
-        product_name: string
-        units_sold: number
-        revenue_generated: number
-        product_photo_urls: string[]
-    }>
-    chartSalesData: number[]
-    chartSalesLabels: string[] // Full day/date for tooltip
-    chartXAxisLabels: string[] // Short day name for X-axis display
-}
+import Image from "next/image"
+import { useDashboardStore } from "@/store/useDashboardStore"
 
 export default function DashboardPage() {
-    const [stats, setStats] = useState<DashboardStats | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+    const { stats, loading, error, fetchStats } = useDashboardStore()
     const { toast } = useToast()
 
     useEffect(() => {
-        const fetchDashboardStats = async () => {
-            setLoading(true)
-            setError(null)
-
-            const {
-                data: { session },
-                error: sessionError,
-            } = await supabase.auth.getSession()
-
-            if (sessionError || !session) {
-                setError("Authentication required.")
-                setLoading(false)
-                return
-            }
-
-            const userId = session.user.id
-
-            // 1. Get company_id and company_name for the logged-in user
-            const { data: companyData, error: companyError } = await supabase
-                .from("companies")
-                .select("id, company_name")
-                .eq("user_id", userId)
-                .single()
-
-            if (companyError || !companyData) {
-                setError("Company not found or not approved.")
-                setLoading(false)
-                return
-            }
-            const companyId = companyData.id
-            const companyName = companyData.company_name
-
-            // 2. Fetch products for this company
-            const { data: productsData, error: productsError } = await supabase
-                .from("products")
-                .select("id, product_name, discount_price, original_price, stock_quantity, is_approved, product_photo_urls")
-                .eq("company_id", companyId)
-
-            if (productsError) {
-                console.error("Error fetching products for dashboard:", productsError)
-                setError("Failed to load product data.")
-                setLoading(false)
-                return
-            }
-
-            const totalProducts = productsData?.length || 0
-            const activeListings = productsData?.filter((p) => p.is_approved).length || 0
-            const outOfStockProducts = productsData?.filter((p) => p.stock_quantity === 0).length || 0
-            
-            // Low Stock threshold: 0 < stock < 10
-            const lowStockProducts = productsData?.filter((p) => p.stock_quantity > 0 && p.stock_quantity < 10) || [] 
-
-            const companyProductIds = new Set(productsData?.map((p) => p.id))
-            const productDetailsMap = new Map(productsData?.map((p) => [p.id, p]))
-
-            // 3. Fetch all orders and filter client-side for company-specific orders
-            const { data: allOrdersData, error: ordersError } = await supabase
-                .from("orders")
-                .select("id, total_amount, status, order_items, purchase_time")
-
-            if (ordersError) {
-                console.error("Error fetching orders for dashboard:", ordersError)
-                setError("Failed to load order data.")
-                setLoading(false)
-                return
-            }
-
-            let totalSalesAmount = 0
-            let totalOrders = 0
-            let pendingOrders = 0
-            const productSales: { [key: string]: { units: number; revenue: number } } = {}
-            
-            // 4. Setup Sales Aggregation for Chart (Last 7 Days)
-            const salesByDate = new Map<string, number>();
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            // Initialize map with last 7 days
-            for (let i = 6; i >= 0; i--) {
-                const date = new Date(today);
-                date.setDate(today.getDate() - i);
-                salesByDate.set(date.toISOString().split('T')[0], 0);
-            }
-
-
-            if (allOrdersData) {
-                allOrdersData.forEach((order) => {
-                    let hasCompanyProductInOrder = false
-                    let companySpecificOrderAmount = 0
-                    
-                    if (Array.isArray(order.order_items)) {
-                        order.order_items.forEach((item: any) => {
-                            if (companyProductIds.has(item.product_id)) {
-                                hasCompanyProductInOrder = true
-                                companySpecificOrderAmount += item.price_at_purchase * item.quantity
-
-                                // Aggregate for all selling products
-                                if (!productSales[item.product_id]) {
-                                    productSales[item.product_id] = { units: 0, revenue: 0 }
-                                }
-                                productSales[item.product_id].units += item.quantity
-                                productSales[item.product_id].revenue += item.price_at_purchase * item.quantity
-                            }
-                        })
-                    }
-
-                    if (hasCompanyProductInOrder) {
-                        totalOrders += 1
-                        totalSalesAmount += companySpecificOrderAmount // Sum only company-relevant sales
-                        if (order.status === "pending" || order.status === "confirmed") {
-                            pendingOrders += 1
-                        }
-
-                        // Aggregate for chart data
-                        const orderDate = new Date(order.purchase_time);
-                        orderDate.setHours(0, 0, 0, 0);
-                        const dateKey = orderDate.toISOString().split('T')[0];
-                        
-                        if (salesByDate.has(dateKey)) {
-                            salesByDate.set(dateKey, salesByDate.get(dateKey)! + 1);
-                        }
-                    }
-                })
-            }
-
-            // Prepare dynamic chart data
-            const sortedSalesData = Array.from(salesByDate.entries()).sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
-            const chartSalesData = sortedSalesData.map(([date, count]) => count);
-            
-            // Full date label for tooltips
-            const chartSalesLabels = sortedSalesData.map(([date]) => new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' }));
-            
-            // Short day label for X-axis
-            const chartXAxisLabels = sortedSalesData.map(([date]) => new Date(date).toLocaleDateString('en-US', { weekday: 'short' }));
-
-
-            // 5. All selling products (use full list)
-            const allSellingProducts = Object.entries(productSales)
-                .map(([productId, data]) => {
-                    const productInfo = productDetailsMap.get(productId)
-                    return {
-                        product_id: productId,
-                        product_name: productInfo?.product_name || "Unknown Product",
-                        units_sold: data.units,
-                        revenue_generated: data.revenue,
-                        product_photo_urls: productInfo?.product_photo_urls || [],
-                    }
-                })
-                .sort((a, b) => b.units_sold - a.units_sold)
-
-
-            setStats({
-                companyName,
-                totalProducts,
-                totalSalesAmount,
-                totalOrders,
-                pendingOrders,
-                activeListings,
-                outOfStockProducts,
-                lowStockProducts,
-                allSellingProducts, 
-                chartSalesData,
-                chartSalesLabels,
-                chartXAxisLabels, // Store new axis labels
-            })
-            setLoading(false)
-        }
-
-        fetchDashboardStats()
-    }, [toast])
+        fetchStats()
+    }, [fetchStats])
 
     if (loading) {
         return (
@@ -331,31 +135,31 @@ export default function DashboardPage() {
                                     // @ts-ignore: react-apexcharts has no types
                                     <Chart
                                         options={{
-                                            chart: { 
-                                                id: "sales-chart", 
+                                            chart: {
+                                                id: "sales-chart",
                                                 toolbar: { show: false },
-                                                
+
                                             },
-                                            
+
                                             // FIX 1: Use chartXAxisLabels for display
-                                            xaxis: { 
-                                                categories: stats.chartXAxisLabels, 
-                                                title: { text: 'Day' } 
+                                            xaxis: {
+                                                categories: stats.chartXAxisLabels,
+                                                title: { text: 'Day' }
                                             },
                                             yaxis: {
                                                 // 💡 FIX: Increase space reserved for the Y-axis title
-                                                title: { 
+                                                title: {
                                                     text: 'Number of Orders',
-                                                    
+
                                                     style: {
-                                                        color: '#1f2937', 
+                                                        color: '#1f2937',
                                                         fontSize: '12px',
                                                         fontWeight: '600',
                                                     },
                                                     // Add margin/padding to ensure it's not clipped (often managed by chart.padding/margin in ApexCharts)
                                                     offsetX: 13, // Slight adjustment if needed, but the main fix is the chart.padding
                                                 },
-                                                labels: { 
+                                                labels: {
                                                     formatter: (val: number) => Math.floor(val) === val ? val.toFixed(0) : '',
                                                     style: {
                                                         colors: ['#4b5563'], // Fixed: Correct property name

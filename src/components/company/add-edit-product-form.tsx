@@ -95,6 +95,7 @@ interface AddEditProductFormProps {
   onSave: (data: ProductFormData, newImages: File[], newVideo: File | null, removedImageUrls: string[]) => Promise<void>
   isEditMode?: boolean
   isLoading?: boolean
+  onValuesChange?: (data: ProductFormData) => void
 }
 
 export function AddEditProductForm({
@@ -102,6 +103,7 @@ export function AddEditProductForm({
   onSave,
   isEditMode = false,
   isLoading = false,
+  onValuesChange,
 }: AddEditProductFormProps) {
   const { toast } = useToast()
 
@@ -189,8 +191,15 @@ export function AddEditProductForm({
   const [selectedMainCategory, setSelectedMainCategory] = useState(mainCategoryKeys[0])
   const [selectedSubCategory, setSelectedSubCategory] = useState(categoryOptions[mainCategoryKeys[0]][0])
 
-  // Watch current form values for preview.
+  // Watch current form values for preview and parent updates.
   const watchedValues = watch()
+
+  // Notify parent of changes
+  useEffect(() => {
+    if (onValuesChange) {
+      onValuesChange(watchedValues as ProductFormData)
+    }
+  }, [watchedValues, onValuesChange])
 
   // Handle image file change and drag/drop
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,8 +516,8 @@ export function AddEditProductForm({
                     {Math.round(
                       (1 -
                         Number.parseFloat(watchedValues.discountPrice) /
-                          Number.parseFloat(watchedValues.originalPrice)) *
-                        100,
+                        Number.parseFloat(watchedValues.originalPrice)) *
+                      100,
                     )}
                     % OFF
                   </span>
@@ -1086,8 +1095,8 @@ export function AddEditProductForm({
                       {Math.round(
                         (1 -
                           Number.parseFloat(watchedValues.discountPrice || "0") /
-                            Number.parseFloat(watchedValues.originalPrice)) *
-                          100,
+                          Number.parseFloat(watchedValues.originalPrice)) *
+                        100,
                       )}
                       % OFF
                     </Badge>

@@ -7,19 +7,32 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { AddEditProductForm, type ProductFormData } from "@/components/company/add-edit-product-form"
+import { useDashboardStore } from "@/store/useDashboardStore"
 
 export default function AddProductPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [companyId, setCompanyId] = useState<string | null>(null)
-  const [isCompanyApproved, setIsCompanyApproved] = useState<boolean | null>(null)
-  const [pageLoading, setPageLoading] = useState(true)
+  const companyStatus = useDashboardStore((state) => state.companyStatus)
+  const setCompanyStatus = useDashboardStore((state) => state.setCompanyStatus)
+  const setAddProductFormState = useDashboardStore((state) => state.setAddProductFormState)
+  const clearAddProductFormState = useDashboardStore((state) => state.clearAddProductFormState)
+
+  // Initialize form state only once from the store to prevent infinite loops
+  const [initialFormState] = useState(() => useDashboardStore.getState().addProductFormState)
+
+  const [pageLoading, setPageLoading] = useState(!companyStatus)
   const [submissionError, setSubmissionError] = useState("")
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const checkAuthAndCompanyStatus = async () => {
+      // If we already have valid company status in store, skip fetching
+      if (companyStatus) {
+        setPageLoading(false)
+        return
+      }
+
       setPageLoading(true)
       const {
         data: { session },
@@ -64,19 +77,19 @@ export default function AddProductPage() {
         return
       }
 
-      setCompanyId(companyData.id)
-      setIsCompanyApproved(companyData.is_approved)
+      // Save to store
+      setCompanyStatus(companyData)
       setPageLoading(false)
     }
 
     checkAuthAndCompanyStatus()
-  }, [router, toast])
+  }, [router, toast, companyStatus, setCompanyStatus])
 
   // General file upload function for Supabase Storage
   const uploadFile = async (file: File, bucketName: string, folder: string) => {
-    if (!companyId) throw new Error("Company ID is missing for file upload.")
+    if (!companyStatus?.id) throw new Error("Company ID is missing for file upload.")
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-    const uniqueFileName = `${folder}/${companyId}/${sanitizedFileName}-${crypto.randomUUID()}`
+    const uniqueFileName = `${folder}/${companyStatus.id}/${sanitizedFileName}-${crypto.randomUUID()}`
     const { data, error } = await supabase.storage.from(bucketName).upload(uniqueFileName, file, {
       cacheControl: "3600",
       upsert: false,
@@ -96,7 +109,7 @@ export default function AddProductPage() {
     newVideo: File | null,
     removedImageUrls: string[], // Not used in add mode, but kept for consistent signature
   ) => {
-    if (!companyId || isCompanyApproved === null || !isCompanyApproved) {
+    if (!companyStatus?.id || !companyStatus?.is_approved) {
       setSubmissionError("Company not approved or ID missing. Cannot add product.")
       return
     }
@@ -122,7 +135,7 @@ export default function AddProductPage() {
 
       // Prepare product data for Supabase.
       const productData = {
-        company_id: companyId,
+        company_id: companyStatus.id,
         product_name: data.productName,
         product_description: data.productDescription,
         original_price: Number.parseFloat(data.originalPrice),
@@ -153,6 +166,7 @@ export default function AddProductPage() {
         description: "Product added successfully. It is pending approval.",
         variant: "default",
       })
+      clearAddProductFormState() // Clear saved form state
       router.push("/company/dashboard/my-products") // Redirect to my products page
     } catch (error: any) {
       console.error("Error adding product:", error)
@@ -162,7 +176,7 @@ export default function AddProductPage() {
     }
   }
 
-  if (pageLoading || isCompanyApproved === null) {
+  if (pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Loader2 className="h-10 w-10 animate-spin text-green-600" />
@@ -171,7 +185,7 @@ export default function AddProductPage() {
     )
   }
 
-  if (!isCompanyApproved) {
+  if (!companyStatus?.is_approved) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md w-full">
@@ -202,7 +216,12 @@ export default function AddProductPage() {
           </Alert>
         )}
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full border border-green-100">
-          <AddEditProductForm onSave={handleSaveProduct} isLoading={isSaving} />
+          <AddEditProductForm
+            onSave={handleSaveProduct}
+            isLoading={isSaving}
+            initialProductData={initialFormState || undefined}
+            onValuesChange={setAddProductFormState}
+          />
         </div>
       </div>
     </div>
