@@ -15,6 +15,58 @@ import Header from "@/components/Header"
 import { supabase } from "@/lib/supabase"
 import AuthPopup from "@/components/auth-popup"
 
+// =========================================================================
+//                             HELPER FUNCTIONS
+// =========================================================================
+
+/**
+ * Helper function to reconstruct the public URL from the stored path (product-media bucket).
+ * FIX APPLIED: Uses decodeURIComponent to prevent double-encoding of special characters (like spaces or parentheses) 
+ * in the file path, resolving the 400 Bad Request error with Next.js Image component.
+ * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
+ * @returns The full public URL string.
+ */
+const getPublicUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    
+    // FIX: Decode the path to handle pre-encoded characters
+    const decodedPath = decodeURIComponent(path);
+    
+    const { data } = supabase.storage
+        .from("product-media")
+        .getPublicUrl(decodedPath);
+
+    return data.publicUrl || "/placeholder.svg";
+};
+
+/**
+ * Helper function to reconstruct the public URL from the stored path (company-documents bucket).
+ * FIX APPLIED: Uses decodeURIComponent to prevent double-encoding of special characters (like spaces or parentheses) 
+ * in the file path, resolving the 400 Bad Request error with Next.js Image component.
+ * @param path The relative path stored in the database (e.g., 'logos/123/file.webp')
+ * @returns The full public URL string.
+ */
+const getCompanyLogoUrlFromPath = (path: string | undefined): string => {
+    if (!path) {
+        return "/placeholder.svg"; // Default placeholder if path is missing
+    }
+    
+    // FIX: Decode the path to handle pre-encoded characters
+    const decodedPath = decodeURIComponent(path);
+    
+    const { data } = supabase.storage
+        .from("company-documents")
+        .getPublicUrl(decodedPath);
+
+    return data.publicUrl || "/placeholder.svg";
+};
+
+// =========================================================================
+//                             PRODUCT COMPONENTS
+// =========================================================================
+
 // Product type definition
 type Product = {
   id: string
@@ -127,7 +179,8 @@ function FavButton({ product }: { product: Product }) {
 }
 
 // Product Card Component – updated to fetch and display actual review data
-function ProductCard({ product }: { product: Product }) {
+// Added index prop to apply the priority optimization
+function ProductCard({ product, index }: { product: Product, index: number }) {
   const [reviewData, setReviewData] = useState({ count: 0, average: 0 })
 
   useEffect(() => {
@@ -183,11 +236,13 @@ function ProductCard({ product }: { product: Product }) {
     >
       <div className="relative aspect-square rounded-t-lg overflow-hidden">
         <Image
-          src={product.product_photo_urls?.[0] || "/placeholder.svg"}
+          // FIX APPLIED: Use helper function for product image URL
+          src={getPublicUrlFromPath(product.product_photo_urls?.[0]) || "/placeholder.svg"}
           alt={product.product_name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
           className="object-cover group-hover:scale-105 transition-transform duration-500"
+          priority={index === 0} // LCP Fix: Set priority for the first product card
         />
         {product.original_price && product.original_price > product.discount_price && (
           <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
@@ -211,7 +266,8 @@ function ProductCard({ product }: { product: Product }) {
         {product.company && (
           <div className="flex items-center gap-2 mb-2">
             <Image
-              src={product.company.company_logo_url || "/placeholder.svg"}
+              // LOGO FIX APPLIED: getCompanyLogoUrlFromPath now uses decodeURIComponent internally
+              src={getCompanyLogoUrlFromPath(product.company.company_logo_url) || "/placeholder.svg"}
               alt={product.company.company_name || "Company Logo"}
               width={16}
               height={16}
@@ -276,6 +332,10 @@ function ProductSkeleton() {
     </div>
   )
 }
+
+// =========================================================================
+//                             MAIN COMPONENT
+// =========================================================================
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -456,8 +516,9 @@ export default function ShopPage() {
             </div>
           ) : getFilteredProducts().length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-              {getFilteredProducts().map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {getFilteredProducts().map((product, index) => (
+                // Pass index for LCP priority optimization
+                <ProductCard key={product.id} product={product} index={index} /> 
               ))}
             </div>
           ) : (

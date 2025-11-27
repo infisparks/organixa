@@ -30,9 +30,14 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
+// =========================================================================
+//                             HELPER FUNCTIONS (FIXED)
+// =========================================================================
+
 // --- Helper function for Product Image path resolution ---
 /**
  * Helper function to reconstruct the public URL from the stored path (product-media bucket).
+ * FIX APPLIED: Uses decodeURIComponent to prevent double-encoding of special characters.
  * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
  * @returns The full public URL string.
  */
@@ -40,10 +45,13 @@ const getPublicUrlFromPath = (path: string | undefined): string => {
     if (!path) {
         return "/placeholder.svg"; // Default placeholder if path is missing
     }
+    // FIX: Decode the path to handle pre-encoded characters
+    const decodedPath = decodeURIComponent(path); 
+
     // Targets the 'product-media' bucket
     const { data } = supabase.storage
         .from("product-media") 
-        .getPublicUrl(path);
+        .getPublicUrl(decodedPath); // Use decodedPath
 
     if (data.publicUrl) return data.publicUrl;
     return "/placeholder.svg";
@@ -52,6 +60,7 @@ const getPublicUrlFromPath = (path: string | undefined): string => {
 // --- NEW Helper function for Company Logo path resolution ---
 /**
  * Helper function to reconstruct the public URL from the stored path (company-documents bucket).
+ * FIX APPLIED: Uses decodeURIComponent to prevent double-encoding of special characters.
  * @param path The relative path stored in the database (e.g., 'logos/123/file.webp')
  * @returns The full public URL string.
  */
@@ -59,14 +68,21 @@ const getCompanyLogoUrlFromPath = (path: string | undefined): string => {
     if (!path) {
         return "/placeholder.svg"; // Default placeholder if path is missing
     }
+    // FIX: Decode the path to handle pre-encoded characters
+    const decodedPath = decodeURIComponent(path);
+
     // Targets the 'company-documents' bucket
     const { data } = supabase.storage
         .from("company-documents")
-        .getPublicUrl(path);
+        .getPublicUrl(decodedPath); // Use decodedPath
 
     if (data.publicUrl) return data.publicUrl;
     return "/placeholder.svg";
 };
+
+// =========================================================================
+//                             COMPONENT START
+// =========================================================================
 
 
 // Product type definition
@@ -122,6 +138,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   
   // --- IMAGE RESOLUTION AT THE START ---
   const images = product.productPhotoUrls ?? []
+  // Note: getPublicUrlFromPath now handles decoding internally.
   const resolvedImages = images.map(getPublicUrlFromPath).filter(url => url !== "/placeholder.svg");
 
   // State for the main image must use the resolved URL
@@ -628,7 +645,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
               {product.productVideoUrl && (
                 <button
                   onClick={() => {
-                    // FIX APPLIED: Use the resolved video URL
+                    // Use the resolved video URL
                     window.open(getPublicUrlFromPath(product.productVideoUrl), "_blank")
                   }}
                   className="relative aspect-square rounded-lg overflow-hidden border-2 transition-all border-transparent hover:border-gray-300 flex items-center justify-center bg-gray-100"
@@ -644,7 +661,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <div className="flex items-center gap-4 mb-6">
               <div className="relative h-12 w-12 overflow-hidden rounded-full border border-gray-200">
                 <Image
-                  // FIX APPLIED: Resolve company logo URL using the specific helper
+                  // Uses the corrected company logo helper
                   src={getCompanyLogoUrlFromPath(product.company.logo) || "/placeholder.svg"}
                   alt={product.company.name}
                   fill
