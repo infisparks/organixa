@@ -1,4 +1,5 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
@@ -18,7 +19,21 @@ export default function AddProductPage() {
   const setAddProductFormState = useDashboardStore((state) => state.setAddProductFormState)
   const clearAddProductFormState = useDashboardStore((state) => state.clearAddProductFormState)
 
-  const [initialFormState] = useState(() => useDashboardStore.getState().addProductFormState)
+  // FIX: Safe initialization to handle Type Mismatch if store has old data
+  const [initialFormState] = useState<ProductFormData | undefined>(() => {
+    const state = useDashboardStore.getState().addProductFormState
+    if (!state) return undefined
+    
+    // Merge with defaults to satisfy the new ProductFormData interface
+    return {
+      ...state,
+      sku: state.sku || "",
+      hsnCode: state.hsnCode || "",
+      taxRate: state.taxRate || "",
+      weightUnit: "kg", // Enforce new standard
+      dimensionUnit: "cm", // Enforce new standard
+    } as ProductFormData
+  })
 
   const [pageLoading, setPageLoading] = useState(!companyStatus)
   const [submissionError, setSubmissionError] = useState("")
@@ -82,12 +97,10 @@ export default function AddProductPage() {
     checkAuthAndCompanyStatus()
   }, [router, toast, companyStatus, setCompanyStatus])
 
-  // UPDATED: Now returns only the storage path (uniqueFileName) instead of the full URL
   const uploadFile = async (file: File, bucketName: string, folder: string) => {
     if (!companyStatus?.id) throw new Error("Company ID is missing for file upload.")
     
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-    // This path is what will be saved to the DB
     const uniqueFileName = `${folder}/${companyStatus.id}/${sanitizedFileName}-${crypto.randomUUID()}`
     
     const { error } = await supabase.storage.from(bucketName).upload(uniqueFileName, file, {
@@ -99,7 +112,6 @@ export default function AddProductPage() {
       throw error
     }
 
-    // We simply return the path (e.g., "images/123/my-image-uuid.jpg")
     return uniqueFileName
   }
 
@@ -123,7 +135,6 @@ export default function AddProductPage() {
     setSubmissionError("")
 
     try {
-      // These will now receive paths, not full URLs
       const uploadImagePromises = newImages.map((file) => uploadFile(file, "product-media", "images"))
       const productPhotoPaths = await Promise.all(uploadImagePromises)
 
@@ -132,22 +143,33 @@ export default function AddProductPage() {
         productVideoPath = await uploadFile(newVideo, "product-media", "videos")
       }
 
+      // UPDATED: Mapping new fields (SKU, HSN, Tax) and enforcing Units (Kg, cm)
       const productData = {
         company_id: companyStatus.id,
         product_name: data.productName,
         product_description: data.productDescription,
+        
+        // --- New Fields for Delivery API ---
+        sku: data.sku,
+        hsn_code: data.hsnCode,
+        tax_rate: data.taxRate ? Number.parseFloat(data.taxRate) : 0,
+        // ----------------------------------
+
         original_price: Number.parseFloat(data.originalPrice),
         discount_price: Number.parseFloat(data.discountPrice),
         stock_quantity: Number.parseInt(data.stockQuantity, 10),
+        
+        // --- Strict Unit Enforcement ---
         weight: Number.parseFloat(data.weight),
-        weight_unit: data.weightUnit,
+        weight_unit: "kg", // Hardcoded for API
         length: Number.parseFloat(data.length),
         width: Number.parseFloat(data.width),
         height: Number.parseFloat(data.height),
-        dimension_unit: data.dimensionUnit,
+        dimension_unit: "cm", // Hardcoded for API
+        // -------------------------------
+
         nutrients: data.nutrients,
         categories: data.categories,
-        // Saving paths only
         product_photo_urls: productPhotoPaths, 
         product_video_url: productVideoPath,
         is_approved: false,
@@ -216,7 +238,8 @@ export default function AddProductPage() {
           <AddEditProductForm
             onSave={handleSaveProduct}
             isLoading={isSaving}
-            initialProductData={initialFormState || undefined}
+            // Pass the safely constructed initial state
+            initialProductData={initialFormState}
             onValuesChange={setAddProductFormState}
           />
         </div>

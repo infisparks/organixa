@@ -1,8 +1,6 @@
 "use client"
 
-import React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useForm, useFieldArray, Controller } from "react-hook-form"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -74,18 +72,22 @@ const categoryOptions: { [key: string]: string[] } = {
 export interface ProductFormData {
   productName: string
   productDescription: string
+  // --- NEW FIELDS FOR API ---
+  sku: string
+  hsnCode: string
+  taxRate: string
+  // -------------------------
   originalPrice: string
   discountPrice: string
   stockQuantity: string
   weight: string
-  weightUnit: string
+  weightUnit: string // Will be forced to 'kg'
   length: string
   width: string
   height: string
-  dimensionUnit: string
+  dimensionUnit: string // Will be forced to 'cm'
   nutrients: Array<{ name: string; value: string }>
   categories: Array<{ main: string; sub: string }>
-  // For existing files, we'll need to pass their URLs
   existingProductPhotoUrls?: string[]
   existingProductVideoUrl?: string | null
 }
@@ -135,15 +137,18 @@ export function AddEditProductForm({
     defaultValues: {
       productName: "",
       productDescription: "",
+      sku: "",       // Default empty
+      hsnCode: "",   // Default empty
+      taxRate: "",   // Default empty
       originalPrice: "",
       discountPrice: "",
       stockQuantity: "",
       weight: "",
-      weightUnit: "kg",
+      weightUnit: "kg", // Forced default
       length: "",
       width: "",
       height: "",
-      dimensionUnit: "cm",
+      dimensionUnit: "cm", // Forced default
       nutrients: [],
       categories: [],
     },
@@ -154,15 +159,18 @@ export function AddEditProductForm({
       reset({
         productName: initialProductData.productName,
         productDescription: initialProductData.productDescription,
+        sku: initialProductData.sku || "",
+        hsnCode: initialProductData.hsnCode || "",
+        taxRate: initialProductData.taxRate || "",
         originalPrice: initialProductData.originalPrice,
         discountPrice: initialProductData.discountPrice,
         stockQuantity: initialProductData.stockQuantity,
         weight: initialProductData.weight,
-        weightUnit: initialProductData.weightUnit,
+        weightUnit: "kg", // Enforce kg on edit
         length: initialProductData.length,
         width: initialProductData.width,
         height: initialProductData.height,
-        dimensionUnit: initialProductData.dimensionUnit,
+        dimensionUnit: "cm", // Enforce cm on edit
         nutrients: initialProductData.nutrients,
         categories: initialProductData.categories,
       })
@@ -402,6 +410,45 @@ export function AddEditProductForm({
                 </p>
               )}
             </div>
+
+            {/* NEW FIELDS FOR DELIVERY API: SKU, HSN, TAX */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="sku" className="text-sm font-medium">SKU (Optional)</Label>
+                <Input
+                  id="sku"
+                  {...register("sku")}
+                  placeholder="e.g. ORG-001"
+                  className="h-11"
+                />
+                <p className="text-[10px] text-gray-500">Stock Keeping Unit for warehouse.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hsnCode" className="text-sm font-medium">HSN Code *</Label>
+                <Input
+                  id="hsnCode"
+                  {...register("hsnCode", { required: "HSN Code is required for shipping" })}
+                  placeholder="e.g. 1006"
+                  className={cn("h-11", errors.hsnCode && "border-red-500")}
+                />
+                 {errors.hsnCode && (
+                  <p className="text-red-500 text-xs">{errors.hsnCode.message}</p>
+                )}
+                <p className="text-[10px] text-gray-500">Required for GST Invoice.</p>
+              </div>
+              <div className="space-y-2">
+                 <Label htmlFor="taxRate" className="text-sm font-medium">Tax Rate (%)</Label>
+                 <Input
+                  id="taxRate"
+                  type="number"
+                  step="0.01"
+                  {...register("taxRate")}
+                  placeholder="e.g. 5 or 12"
+                  className="h-11"
+                 />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="productDescription" className="text-sm font-medium">
                 Product Description *
@@ -536,52 +583,36 @@ export function AddEditProductForm({
         {/* Dimensions */}
         <Card className="rounded-2xl shadow-xl border-0 bg-gradient-to-br from-green-50 via-white to-blue-50">
           <CardHeader>
-            <CardTitle className="text-xl">Dimensions</CardTitle>
-            <CardDescription>Provide accurate weight and dimensions for shipping.</CardDescription>
+            <CardTitle className="text-xl">Dimensions & Shipping</CardTitle>
+            <CardDescription>
+              <span className="font-bold text-red-600">Important:</span> Exact values required for Delivery API. 
+              Units are strictly <strong>Kilograms (kg)</strong> and <strong>Centimeters (cm)</strong>.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
-                <strong>Why dimensions matter:</strong> Accurate dimensions help calculate shipping costs and ensure
-                proper packaging for delivery.
-              </p>
-            </div>
             <div className="space-y-2">
               <Label htmlFor="weight" className="text-sm font-medium">
                 Weight *
               </Label>
-              <div className="flex">
+              <div className="relative">
                 <Input
                   id="weight"
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   {...register("weight", {
                     required: "Weight is required",
                     min: { value: 0, message: "Weight cannot be negative" },
                   })}
                   placeholder="0.00"
                   className={cn(
-                    "h-11 rounded-r-none transition-all duration-200",
+                    "h-11 pr-10 transition-all duration-200",
                     errors.weight && "border-red-500 focus:border-red-500",
                   )}
                 />
-                <Controller
-                  control={control}
-                  name="weightUnit"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-24 rounded-l-none h-11">
-                        <SelectValue placeholder="Unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="kg">kg</SelectItem>
-                        <SelectItem value="g">g</SelectItem>
-                        <SelectItem value="lb">lb</SelectItem>
-                        <SelectItem value="oz">oz</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
+                {/* FORCED UNIT DISPLAY INSTEAD OF SELECTOR */}
+                <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-gray-100 border-l px-3 rounded-r-md text-sm font-medium text-gray-600">
+                  kg
+                </div>
               </div>
               {errors.weight && (
                 <p className="text-red-500 text-sm flex items-center gap-1">
@@ -590,25 +621,31 @@ export function AddEditProductForm({
                 </p>
               )}
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="length" className="text-sm font-medium">
                   Length *
                 </Label>
-                <Input
-                  id="length"
-                  type="number"
-                  step="0.1"
-                  {...register("length", {
-                    required: "Length is required",
-                    min: { value: 0, message: "Length cannot be negative" },
-                  })}
-                  placeholder="0.0"
-                  className={cn(
-                    "h-11 transition-all duration-200",
-                    errors.length && "border-red-500 focus:border-red-500",
-                  )}
-                />
+                <div className="relative">
+                  <Input
+                    id="length"
+                    type="number"
+                    step="0.1"
+                    {...register("length", {
+                      required: "Length is required",
+                      min: { value: 0, message: "Length cannot be negative" },
+                    })}
+                    placeholder="0.0"
+                    className={cn(
+                      "h-11 pr-10 transition-all duration-200",
+                      errors.length && "border-red-500 focus:border-red-500",
+                    )}
+                  />
+                  <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-gray-100 border-l px-3 rounded-r-md text-sm font-medium text-gray-600">
+                    cm
+                  </div>
+                </div>
                 {errors.length && (
                   <p className="text-red-500 text-sm flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
@@ -620,20 +657,25 @@ export function AddEditProductForm({
                 <Label htmlFor="width" className="text-sm font-medium">
                   Width *
                 </Label>
-                <Input
-                  id="width"
-                  type="number"
-                  step="0.1"
-                  {...register("width", {
-                    required: "Width is required",
-                    min: { value: 0, message: "Width cannot be negative" },
-                  })}
-                  placeholder="0.0"
-                  className={cn(
-                    "h-11 transition-all duration-200",
-                    errors.width && "border-red-500 focus:border-red-500",
-                  )}
-                />
+                <div className="relative">
+                  <Input
+                    id="width"
+                    type="number"
+                    step="0.1"
+                    {...register("width", {
+                      required: "Width is required",
+                      min: { value: 0, message: "Width cannot be negative" },
+                    })}
+                    placeholder="0.0"
+                    className={cn(
+                      "h-11 pr-10 transition-all duration-200",
+                      errors.width && "border-red-500 focus:border-red-500",
+                    )}
+                  />
+                  <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-gray-100 border-l px-3 rounded-r-md text-sm font-medium text-gray-600">
+                    cm
+                  </div>
+                </div>
                 {errors.width && (
                   <p className="text-red-500 text-sm flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
@@ -645,20 +687,25 @@ export function AddEditProductForm({
                 <Label htmlFor="height" className="text-sm font-medium">
                   Height *
                 </Label>
-                <Input
-                  id="height"
-                  type="number"
-                  step="0.1"
-                  {...register("height", {
-                    required: "Height is required",
-                    min: { value: 0, message: "Height cannot be negative" },
-                  })}
-                  placeholder="0.0"
-                  className={cn(
-                    "h-11 transition-all duration-200",
-                    errors.height && "border-red-500 focus:border-red-500",
-                  )}
-                />
+                <div className="relative">
+                   <Input
+                    id="height"
+                    type="number"
+                    step="0.1"
+                    {...register("height", {
+                      required: "Height is required",
+                      min: { value: 0, message: "Height cannot be negative" },
+                    })}
+                    placeholder="0.0"
+                    className={cn(
+                      "h-11 pr-10 transition-all duration-200",
+                      errors.height && "border-red-500 focus:border-red-500",
+                    )}
+                  />
+                  <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-gray-100 border-l px-3 rounded-r-md text-sm font-medium text-gray-600">
+                    cm
+                  </div>
+                </div>
                 {errors.height && (
                   <p className="text-red-500 text-sm flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
@@ -667,28 +714,7 @@ export function AddEditProductForm({
                 )}
               </div>
             </div>
-            <div className="w-full md:w-1/3">
-              <Label htmlFor="dimensionUnit" className="text-sm font-medium">
-                Dimension Unit
-              </Label>
-              <Controller
-                control={control}
-                name="dimensionUnit"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full h-11">
-                      <SelectValue placeholder="Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cm">cm</SelectItem>
-                      <SelectItem value="m">m</SelectItem>
-                      <SelectItem value="in">in</SelectItem>
-                      <SelectItem value="ft">ft</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
+            
           </CardContent>
         </Card>
 
@@ -1085,6 +1111,9 @@ export function AddEditProductForm({
             {/* Product Info */}
             <div className="space-y-3">
               <h3 className="font-semibold text-lg leading-tight">{watchedValues.productName || "Product Name"}</h3>
+              <div className="text-xs text-gray-500 mb-1">
+                 {watchedValues.sku ? `SKU: ${watchedValues.sku}` : ""}
+              </div>
               {/* Price Display */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-2xl font-bold text-green-600">₹{watchedValues.discountPrice || "0.00"}</span>
@@ -1129,7 +1158,7 @@ export function AddEditProductForm({
                   <div className="flex justify-between">
                     <span>Weight:</span>
                     <span className="font-medium">
-                      {watchedValues.weight} {watchedValues.weightUnit}
+                      {watchedValues.weight} kg
                     </span>
                   </div>
                   {watchedValues.length && watchedValues.width && watchedValues.height && (
@@ -1137,7 +1166,7 @@ export function AddEditProductForm({
                       <span>Dimensions:</span>
                       <span className="font-medium">
                         {watchedValues.length} × {watchedValues.width} × {watchedValues.height}{" "}
-                        {watchedValues.dimensionUnit}
+                        cm
                       </span>
                     </div>
                   )}

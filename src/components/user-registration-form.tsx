@@ -8,27 +8,28 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Loader2, AlertCircle, User, Phone, Home, Building, MapPin, Globe } from "lucide-react"
+import { Loader2, AlertCircle, User, Phone, MapPin, Globe, Navigation } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { v4 as uuidv4 } from "uuid"
 
+// Updated Interface to match Shipping API structure
 interface Address {
   id: string
   name: string
-  houseNumber: string
-  street: string
-  area: string
+  addressLine1: string // API: add (Mandatory)
+  addressLine2?: string // API: add2
+  addressLine3?: string // API: add3
   city: string
   state: string
-  pincode: string
+  pincode: string // API: pin (Mandatory)
   country: string
   primaryPhone: string
   secondaryPhone?: string
   isDefault: boolean
-  lat?: number
-  lng?: number
+  lat?: number // Captured via Geolocation
+  lng?: number // Captured via Geolocation
 }
 
 export default function UserRegistrationForm() {
@@ -37,22 +38,70 @@ export default function UserRegistrationForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // New states for additional user details
+  // User Identity
   const [userName, setUserName] = useState("")
   const [primaryPhone, setPrimaryPhone] = useState("")
   const [secondaryPhone, setSecondaryPhone] = useState("")
 
-  // New states for optional address details
-  const [houseNumber, setHouseNumber] = useState("")
-  const [street, setStreet] = useState("")
-  const [area, setArea] = useState("")
+  // Address Details (Aligned with Shipping API)
+  const [addressLine1, setAddressLine1] = useState("") // Mandatory
+  const [addressLine2, setAddressLine2] = useState("")
+  const [addressLine3, setAddressLine3] = useState("")
   const [city, setCity] = useState("")
   const [state, setState] = useState("")
   const [pincode, setPincode] = useState("")
   const [country, setCountry] = useState("India")
-  const [isDefaultAddress, setIsDefaultAddress] = useState(true) // Default to true for initial address
+  
+  // Geolocation
+  const [lat, setLat] = useState<number | null>(null)
+  const [lng, setLng] = useState<number | null>(null)
+  
+  const [isDefaultAddress, setIsDefaultAddress] = useState(true)
+
+  // Function to fetch current browser location
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Error",
+        description: "Geolocation is not supported by your browser",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLocationLoading(true)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = position.coords.latitude
+        const longitude = position.coords.longitude
+        setLat(latitude)
+        setLng(longitude)
+        
+        toast({
+          title: "Location Fetched",
+          description: `Coordinates captured: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          variant: "default",
+        })
+        setLocationLoading(false)
+        
+        // Optional: You could use a Reverse Geocoding API here (like Google Maps or OpenStreetMap)
+        // to automatically fill the city/state/pincode based on lat/lng.
+        // For now, we just save the exact coordinates for the delivery driver.
+      },
+      (error) => {
+        setLocationLoading(false)
+        toast({
+          title: "Location Error",
+          description: "Unable to retrieve your location. Please allow location access.",
+          variant: "destructive",
+        })
+      }
+    )
+  }
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,6 +109,7 @@ export default function UserRegistrationForm() {
     setError(null)
 
     try {
+      // 1. Create Auth User
       const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
       if (signUpError) throw signUpError
 
@@ -68,34 +118,38 @@ export default function UserRegistrationForm() {
         const userEmail = data.user.email
 
         const addressesToSave: Address[] = []
-        if (houseNumber && street && area && city && state && pincode && country && primaryPhone) {
+        
+        // Ensure mandatory shipping fields are present
+        if (addressLine1 && pincode && country && primaryPhone) {
           const newAddress: Address = {
             id: uuidv4(),
-            name: `${houseNumber}, ${street}`, // A simple name for the address
-            houseNumber,
-            street,
-            area,
+            name: userName, // Using User Name as Recipient Name
+            addressLine1,
+            addressLine2: addressLine2 || undefined,
+            addressLine3: addressLine3 || undefined,
             city,
             state,
             pincode,
             country,
-            primaryPhone: primaryPhone, // Use the primary phone from the main form
+            primaryPhone,
             secondaryPhone: secondaryPhone || undefined,
             isDefault: isDefaultAddress,
+            lat: lat || undefined,
+            lng: lng || undefined
           }
           addressesToSave.push(newAddress)
         }
 
-        // Insert or update user_profiles table
+        // 2. Insert into user_profiles
         const { error: profileError } = await supabase.from("user_profiles").upsert(
           {
             id: userId,
             email: userEmail,
             name: userName,
             phone: primaryPhone,
-            addresses: addressesToSave,
+            addresses: addressesToSave, // Saves JSON structure including lat/lng
           },
-          { onConflict: "id" }, // Use upsert to handle cases where profile might already exist (e.g., from previous partial registration)
+          { onConflict: "id" },
         )
 
         if (profileError) {
@@ -105,10 +159,10 @@ export default function UserRegistrationForm() {
 
         toast({
           title: "Registration successful!",
-          description: "Please check your email to confirm your account. Redirecting to login...",
+          description: "Please check your email to confirm your account. Redirecting...",
           variant: "default",
         })
-        router.push("/login") // Redirect to login after successful registration
+        router.push("/login")
       }
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.")
@@ -124,10 +178,10 @@ export default function UserRegistrationForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-      <Card className="w-full max-w-md shadow-xl">
+      <Card className="w-full max-w-lg shadow-xl my-8">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-gray-900">Create Your Account</CardTitle>
-          <CardDescription className="text-gray-600">Sign up to explore our organic products</CardDescription>
+          <CardTitle className="text-3xl font-bold text-gray-900">Create Account</CardTitle>
+          <CardDescription className="text-gray-600">Enter details for seamless delivery</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-6">
@@ -137,31 +191,34 @@ export default function UserRegistrationForm() {
                 {error}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-11"
-              />
+
+            {/* Account Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="userName">Full Name *</Label>
+              <Label htmlFor="userName">Full Name (Customer Name) *</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -171,139 +228,148 @@ export default function UserRegistrationForm() {
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   required
-                  className="pl-10 h-11"
+                  className="pl-10"
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="primaryPhone">Primary Phone Number *</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="primaryPhone"
-                  type="tel"
-                  placeholder="9876543210"
-                  value={primaryPhone}
-                  onChange={(e) => setPrimaryPhone(e.target.value)}
-                  required
-                  className="pl-10 h-11"
-                />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="primaryPhone">Mobile Number *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    id="primaryPhone"
+                    type="tel"
+                    placeholder="9876543210"
+                    value={primaryPhone}
+                    onChange={(e) => setPrimaryPhone(e.target.value)}
+                    required
+                    className="pl-10"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="secondaryPhone">Secondary Phone Number (Optional)</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <div className="space-y-2">
+                <Label htmlFor="secondaryPhone">Alt Phone (Optional)</Label>
                 <Input
                   id="secondaryPhone"
                   type="tel"
                   placeholder="Optional"
                   value={secondaryPhone}
                   onChange={(e) => setSecondaryPhone(e.target.value)}
-                  className="pl-10 h-11"
                 />
               </div>
             </div>
 
-            <h4 className="text-md font-semibold text-gray-800 mt-4">Optional Address Details</h4>
-            <div className="space-y-2">
-              <Label htmlFor="houseNumber">House/Flat Number</Label>
-              <div className="relative">
-                <Home className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="houseNumber"
-                  type="text"
-                  placeholder="A-101"
-                  value={houseNumber}
-                  onChange={(e) => setHouseNumber(e.target.value)}
-                  className="pl-10 h-11"
-                />
+            <div className="border-t pt-4 mt-4">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-md font-semibold text-gray-800">Delivery Address</h4>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleGetLocation}
+                  disabled={locationLoading}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  {locationLoading ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Navigation className="h-4 w-4 mr-1" />
+                  )}
+                  {lat ? "Location Captured" : "Detect Location"}
+                </Button>
+              </div>
+
+              {lat && lng && (
+                 <div className="mb-4 text-xs text-green-600 flex items-center bg-green-50 p-2 rounded">
+                    <Navigation className="w-3 h-3 mr-1"/> 
+                    Coordinates saved for precise delivery ({lat.toFixed(5)}, {lng.toFixed(5)})
+                 </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="addressLine1">Address Line 1 (Flat/House/Building) *</Label>
+                  <Input
+                    id="addressLine1"
+                    placeholder="e.g. Flat 101, Galaxy Apartments"
+                    value={addressLine1}
+                    onChange={(e) => setAddressLine1(e.target.value)}
+                    required
+                  />
+                  <p className="text-[10px] text-gray-500">API Mapping: 'add' (Mandatory)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="addressLine2">Address Line 2 (Street/Colony) (Optional)</Label>
+                  <Input
+                    id="addressLine2"
+                    placeholder="e.g. MG Road, Andheri West"
+                    value={addressLine2}
+                    onChange={(e) => setAddressLine2(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="addressLine3">Address Line 3 (Landmark) (Optional)</Label>
+                  <Input
+                    id="addressLine3"
+                    placeholder="e.g. Near City Mall"
+                    value={addressLine3}
+                    onChange={(e) => setAddressLine3(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pincode">Pincode *</Label>
+                    <Input
+                      id="pincode"
+                      placeholder="400001"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="Mumbai"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      placeholder="Maharashtra"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        id="country"
+                        placeholder="India"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="street">Street/Road Name</Label>
-              <div className="relative">
-                <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="street"
-                  type="text"
-                  placeholder="SV Road"
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="area">Area/Locality</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="area"
-                  type="text"
-                  placeholder="Andheri West"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="city"
-                  type="text"
-                  placeholder="Mumbai"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="state"
-                  type="text"
-                  placeholder="Maharashtra"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pincode">Pincode</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="pincode"
-                  type="text"
-                  placeholder="400001"
-                  value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <div className="relative">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="country"
-                  type="text"
-                  placeholder="India"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="isDefaultAddress"
@@ -318,16 +384,11 @@ export default function UserRegistrationForm() {
               {loading ? "Registering..." : "Register"}
             </Button>
           </form>
+          
           <p className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{" "}
             <Link href="/login" className="font-medium text-blue-600 hover:underline">
               Login
-            </Link>
-          </p>
-          <p className="mt-4 text-center text-xs text-gray-500">
-            Are you a company looking to register?{" "}
-            <Link href="/company/registration" className="font-medium text-green-600 hover:underline">
-              Register your company here
             </Link>
           </p>
         </CardContent>

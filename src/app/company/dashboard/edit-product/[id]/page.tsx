@@ -9,64 +9,57 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { AddEditProductForm, type ProductFormData } from "@/components/company/add-edit-product-form"
 
-// --- Interface Definitions (Kept the same) ---
+// --- Interface Definitions ---
 interface ProductDataFromDB {
   id: string
   product_name: string
   product_description: string
+  
+  // New Fields for Delivery API
+  sku: string | null
+  hsn_code: string | null
+  tax_rate: number | null
+
   original_price: number
   discount_price: number
   stock_quantity: number
+  
   weight: number
   weight_unit: string
   length: number
   width: number
   height: number
   dimension_unit: string
+  
   nutrients: Array<{ name: string; value: string }>
   categories: Array<{ main: string; sub: string }>
-  product_photo_urls: string[] // These now hold paths
-  product_video_url: string | null // This now holds a path or null
+  product_photo_urls: string[] 
+  product_video_url: string | null
   is_approved: boolean
   company_id: string
 }
 
 /**
- * Helper function to reconstruct the public URL from the stored path.
- * The paths are stored in the 'product-media' bucket.
- * @param path The relative path stored in the database (e.g., 'images/123/file.jpg')
- * @returns The full public URL string.
+ * Helper: Reconstruct public URL from path
  */
 const getPublicUrlFromPath = (path: string | undefined): string => {
-    if (!path) {
-        return ""; // Return empty string for optional fields
-    }
-    // Use the getPublicUrl method which correctly constructs the URL using the project config
-    const { data } = supabase.storage
-        .from("product-media")
-        .getPublicUrl(path);
-
-    // If data.publicUrl exists, return it, otherwise return an empty string
+    if (!path) return ""; 
+    const { data } = supabase.storage.from("product-media").getPublicUrl(path);
     return data.publicUrl || "";
 };
 
 /**
- * Helper function to extract the path from a full public URL.
- * @param url The full public URL (e.g., https://xyz.supabase.co/storage/v1/object/public/product-media/images/123/file.jpg)
- * @returns The relative path (e.g., 'images/123/file.jpg')
+ * Helper: Extract path from public URL
  */
 const getPathFromPublicUrl = (url: string | undefined | null): string | null => {
     if (!url) return null;
-    // Find the starting point after the bucket name (product-media/)
     const parts = url.split("product-media/");
     return parts.length > 1 ? parts[1] : null;
 };
 
-
 export default function EditProductPage() {
   const router = useRouter()
   const params = useParams()
-  // Safely extract ID and ensure it is a string
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id 
   const { toast } = useToast()
 
@@ -76,18 +69,15 @@ export default function EditProductPage() {
   const [submissionError, setSubmissionError] = useState("")
   const [isSaving, setIsSaving] = useState(false)
 
-  // Tracker to prevent duplicate fetching
   const lastFetchedId = useRef<string | null>(null)
 
   useEffect(() => {
-    // 1. Validation
     if (!id) {
       setFetchError("Product ID is missing.")
       setPageLoading(false)
       return
     }
 
-    // 2. Optimization: If we have data, DO NOT fetch again.
     if (initialProductData || lastFetchedId.current === id) {
       setPageLoading(false)
       return
@@ -99,24 +89,16 @@ export default function EditProductPage() {
       setFetchError(null)
 
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
         if (sessionError || !session) {
-          toast({
-            title: "Authentication Required",
-            description: "Please log in to edit products.",
-            variant: "destructive",
-          })
+          toast({ title: "Authentication Required", description: "Please log in.", variant: "destructive" })
           router.push("/login")
           return
         }
 
         const userId = session.user.id
 
-        // Get company_id 
         const { data: companyData, error: companyError } = await supabase
           .from("companies")
           .select("id, is_approved")
@@ -124,18 +106,13 @@ export default function EditProductPage() {
           .single()
 
         if (companyError || !companyData) {
-          console.error("Error fetching company data:", companyError)
-          setFetchError("Company record not found or not approved for this user.")
+          setFetchError("Company record not found.")
           setPageLoading(false)
           return
         }
 
         if (!companyData.is_approved) {
-          toast({
-            title: "Approval Pending",
-            description: "Your company must be approved to edit products.",
-            variant: "destructive",
-          })
+          toast({ title: "Approval Pending", description: "Company must be approved.", variant: "destructive" })
           router.push("/company/dashboard")
           setPageLoading(false)
           return
@@ -152,10 +129,9 @@ export default function EditProductPage() {
           .single()
 
         if (productError || !productData) {
-          console.error("Error fetching product:", productError)
-          setFetchError("Product not found or you don't have permission to edit it.")
+          setFetchError("Product not found.")
         } else {
-          // --- FIX APPLIED HERE: Convert stored paths to full public URLs for the form ---
+          // Convert stored paths to full public URLs
           const existingProductPhotoUrls = productData.product_photo_urls
             ? productData.product_photo_urls.map(getPublicUrlFromPath).filter(url => url !== "")
             : [];
@@ -164,18 +140,31 @@ export default function EditProductPage() {
             ? getPublicUrlFromPath(productData.product_video_url)
             : null;
 
+          // Map DB data to Form Data
           const mappedData: ProductFormData = {
             productName: productData.product_name,
             productDescription: productData.product_description,
+            
+            // --- NEW FIELDS MAPPED HERE ---
+            sku: productData.sku || "",
+            hsnCode: productData.hsn_code || "",
+            taxRate: productData.tax_rate ? productData.tax_rate.toString() : "",
+            // ------------------------------
+
             originalPrice: productData.original_price.toString(),
             discountPrice: productData.discount_price.toString(),
             stockQuantity: productData.stock_quantity.toString(),
+            
             weight: productData.weight.toString(),
-            weightUnit: productData.weight_unit,
+            // Enforce 'kg' on edit load to match new standard
+            weightUnit: "kg", 
+            
             length: productData.length.toString(),
             width: productData.width.toString(),
             height: productData.height.toString(),
-            dimensionUnit: productData.dimension_unit,
+            // Enforce 'cm' on edit load to match new standard
+            dimensionUnit: "cm", 
+
             nutrients: productData.nutrients || [],
             categories: productData.categories || [],
             existingProductPhotoUrls: existingProductPhotoUrls,
@@ -192,10 +181,8 @@ export default function EditProductPage() {
     }
 
     fetchProductAndAuth()
-  }, [id, router, toast, initialProductData]) // Added initialProductData to deps
+  }, [id, router, toast, initialProductData])
 
-  // General file upload function
-  // FIX APPLIED HERE: Now returns the storage path (uniqueFileName), not the full URL
   const uploadFile = async (file: File, bucketName: string, folder: string, companyId: string) => {
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
     const uniqueFileName = `${folder}/${companyId}/${sanitizedFileName}-${crypto.randomUUID()}`
@@ -206,15 +193,14 @@ export default function EditProductPage() {
     })
 
     if (error) throw error
-    
-    return uniqueFileName // Return the path for database storage
+    return uniqueFileName
   }
 
   const handleSaveProduct = async (
     data: ProductFormData,
     newImages: File[],
     newVideo: File | null,
-    removedImageUrls: string[], // These are full public URLs from the form
+    removedImageUrls: string[],
   ) => {
     setIsSaving(true)
     setSubmissionError("")
@@ -222,7 +208,7 @@ export default function EditProductPage() {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
     if (sessionError || !session) {
-      setSubmissionError("Authentication required to save changes.")
+      setSubmissionError("Authentication required.")
       setIsSaving(false)
       return
     }
@@ -231,79 +217,75 @@ export default function EditProductPage() {
     const { data: companyData } = await supabase.from("companies").select("id").eq("user_id", userId).single()
 
     if (!companyData?.id) {
-      setSubmissionError("Company ID not found. Cannot save product.")
+      setSubmissionError("Company ID not found.")
       setIsSaving(false)
       return
     }
     const companyId = companyData.id
 
     try {
-      // 1. Delete removed images (Paths must be extracted from the URLs)
+      // 1. Delete removed images
       const deleteImagePromises = removedImageUrls.map((url) => {
-        const path = getPathFromPublicUrl(url); // FIX APPLIED HERE: Use helper to get path
-        if (path) {
-            return supabase.storage.from("product-media").remove([path])
-        }
-        return Promise.resolve({ data: null, error: null }); // Resolve if path is null
+        const path = getPathFromPublicUrl(url); 
+        if (path) return supabase.storage.from("product-media").remove([path])
+        return Promise.resolve({ data: null, error: null });
       })
       await Promise.all(deleteImagePromises)
 
-      // 2. Upload new images (These now return paths)
+      // 2. Upload new images
       const uploadImagePromises = newImages.map((file) => uploadFile(file, "product-media", "images", companyId))
-      const newProductPhotoPaths = await Promise.all(uploadImagePromises) // These are paths
+      const newProductPhotoPaths = await Promise.all(uploadImagePromises)
 
-      // 3. Construct the list of existing, kept paths
+      // 3. Keep existing paths
       const existingKeptPaths = (initialProductData?.existingProductPhotoUrls || [])
-        .filter((url) => !removedImageUrls.includes(url)) // Filter URLs that were NOT removed
-        .map(url => getPathFromPublicUrl(url)) // Convert remaining URLs back to paths
-        .filter((path): path is string => !!path); // Ensure paths are valid strings
+        .filter((url) => !removedImageUrls.includes(url))
+        .map(url => getPathFromPublicUrl(url))
+        .filter((path): path is string => !!path);
 
-      // 4. Combine existing kept paths and new paths
-      const finalProductPhotoPaths = [
-        ...existingKeptPaths,
-        ...newProductPhotoPaths,
-      ]
+      const finalProductPhotoPaths = [...existingKeptPaths, ...newProductPhotoPaths]
 
-      // 5. Handle video
+      // 4. Handle video
       let finalProductVideoPath: string | null = null;
       let existingVideoPath = getPathFromPublicUrl(initialProductData?.existingProductVideoUrl);
 
       if (newVideo) {
-        // Upload new video, result is a path
         finalProductVideoPath = await uploadFile(newVideo, "product-media", "videos", companyId) 
-        // Delete old video if it exists
-        if (existingVideoPath) {
-          await supabase.storage.from("product-media").remove([existingVideoPath])
-        }
+        if (existingVideoPath) await supabase.storage.from("product-media").remove([existingVideoPath])
       } else if (newVideo === null && initialProductData?.existingProductVideoUrl) {
-        // User explicitly removed video (newVideo is null, but existing URL was present)
-        if (existingVideoPath) {
-          await supabase.storage.from("product-media").remove([existingVideoPath])
-        }
+        if (existingVideoPath) await supabase.storage.from("product-media").remove([existingVideoPath])
         finalProductVideoPath = null
       } else {
-          // No change to video, keep the existing path (or null)
           finalProductVideoPath = existingVideoPath;
       }
-
 
       const productUpdateData = {
         product_name: data.productName,
         product_description: data.productDescription,
+        
+        // --- NEW FIELDS SAVED HERE ---
+        sku: data.sku,
+        hsn_code: data.hsnCode,
+        tax_rate: data.taxRate ? Number.parseFloat(data.taxRate) : 0,
+        // -----------------------------
+
         original_price: Number.parseFloat(data.originalPrice),
         discount_price: Number.parseFloat(data.discountPrice),
         stock_quantity: Number.parseInt(data.stockQuantity, 10),
+        
+        // --- ENFORCED UNITS SAVED HERE ---
         weight: Number.parseFloat(data.weight),
-        weight_unit: data.weightUnit,
+        weight_unit: "kg", // Forced
         length: Number.parseFloat(data.length),
         width: Number.parseFloat(data.width),
         height: Number.parseFloat(data.height),
-        dimension_unit: data.dimensionUnit,
+        dimension_unit: "cm", // Forced
+        // ---------------------------------
+
         nutrients: data.nutrients,
         categories: data.categories,
-        // FIX APPLIED HERE: Save paths to the database
         product_photo_urls: finalProductPhotoPaths,
         product_video_url: finalProductVideoPath,
+        is_approved: false, // Reset approval on edit
       }
 
       const { error: dbError } = await supabase
@@ -316,14 +298,14 @@ export default function EditProductPage() {
 
       toast({
         title: "Success!",
-        description: "Product updated successfully.",
+        description: "Product updated successfully. Pending re-approval.",
         variant: "default",
       })
       
       router.push("/company/dashboard/my-products") 
     } catch (error: any) {
       console.error("Error updating product:", error)
-      setSubmissionError(error.message || "Error updating product. Please try again.")
+      setSubmissionError(error.message || "Error updating product.")
     } finally {
       setIsSaving(false)
     }
@@ -344,9 +326,7 @@ export default function EditProductPage() {
         <Alert variant="destructive" className="max-w-md w-full">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{fetchError}</AlertDescription>
-          <Button onClick={() => router.back()} className="mt-4">
-            Go Back
-          </Button>
+          <Button onClick={() => router.back()} className="mt-4">Go Back</Button>
         </Alert>
       </div>
     )
@@ -354,17 +334,17 @@ export default function EditProductPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-yellow-100">
-      <nav className="w-full h-16 px-6 flex items-center bg-gradient-to-r from-blue-100 via-green-50 to-green-100 shadow-sm rounded-b-2xl mb-8 font-[Inter,sans-serif]">
+      <nav className="w-full h-16 px-6 flex items-center bg-white shadow-sm mb-8">
         <div className="flex items-center gap-3">
           <Edit className="h-7 w-7 text-yellow-500" />
-          <span className="text-xl md:text-2xl font-semibold tracking-tight text-gray-800">Edit Product</span>
+          <span className="text-xl font-semibold">Edit Product</span>
         </div>
       </nav>
       <div className="container mx-auto px-4 py-8">
         {submissionError && (
-          <Alert variant="destructive" className="mb-4 rounded-xl shadow-md bg-red-50 border-red-200">
-            <AlertCircle className="h-4 w-4 text-red-500" />
-            <AlertDescription className="text-red-700">{submissionError}</AlertDescription>
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{submissionError}</AlertDescription>
           </Alert>
         )}
         {initialProductData && (
