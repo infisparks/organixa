@@ -21,15 +21,14 @@ export async function generateStaticParams() {
   }))
 }
 
-// --- IMPORTANT FIX ---
-// Do NOT define custom interface for props
-// Let Next.js automatically type the params
+// Define the Props type for Next.js 16+
+type Props = {
+  params: Promise<{ id: string }>
+}
 
-export default async function ProductPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+export default async function ProductPage(props: Props) {
+  // FIX: Await the params object (Required in Next.js 15/16)
+  const params = await props.params
   const { id } = params
 
   const { data: productFound, error } = await supabase
@@ -45,7 +44,8 @@ export default async function ProductPage({
     .single()
 
   if (error || !productFound) {
-    console.error("Error fetching product:", error)
+    // Improved logging: prints the full error object so you can debug RLS/DB issues
+    console.error(`Error fetching product [ID: ${id}]:`, JSON.stringify(error, null, 2))
     return notFound()
   }
 
