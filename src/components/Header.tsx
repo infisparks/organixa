@@ -48,6 +48,7 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
                     .eq("user_id", currentUserId)
                 setCartCount(cartItemsCount || 0)
 
+                
                 // Fetch favorites count
                 const { count: favItemsCount } = await supabase
                     .from("favorites")
