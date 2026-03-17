@@ -10,45 +10,50 @@ import { supabase } from "@/lib/supabase" // Supabase import
 import { Input } from "@/components/ui/input" // Import Input component
 
 interface HeaderProps {
-  showSearchBar?: boolean
-  onSearch?: (term: string) => void
+    showSearchBar?: boolean
+    onSearch?: (term: string) => void
 }
 
 export default function Header({ showSearchBar = true, onSearch }: HeaderProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [cartCount, setCartCount] = useState(0)
-  const [favCount, setFavCount] = useState(0)
-  const [user, setUser] = useState<any>(null)
-  const [localSearchTerm, setLocalSearchTerm] = useState("") // Local state for search input
-  const router = useRouter()
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [cartCount, setCartCount] = useState(0)
+    const [favCount, setFavCount] = useState(0)
+    const [user, setUser] = useState<any>(null)
+    const [isApprovedCompany, setIsApprovedCompany] = useState(false) // 🎯 Check for approved company instead of is_admin
+    const [localSearchTerm, setLocalSearchTerm] = useState("")
+    const router = useRouter()
 
-  useEffect(() => {
-    let cartChannel: any = null;
-    let favChannel: any = null;
+    useEffect(() => {
+        let cartChannel: any = null;
+        let favChannel: any = null;
 
-    const getSessionAndCounts = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const currentUserId = session?.user?.id || null
-      setUser(session?.user || null)
+        const getSessionAndCounts = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            const currentUserId = session?.user?.id || null
+            setUser(session?.user || null)
 
-      if (currentUserId) {
-        // Fetch cart count
-        const { count: cartItemsCount, error: cartError } = await supabase
-          .from("cart_items")
-          .select("id", { count: "exact" })
-          .eq("user_id", currentUserId)
-        if (cartError) console.error("Error fetching cart count:", cartError.message || cartError)
-        setCartCount(cartItemsCount || 0)
+            if (currentUserId) {
+                // Fetch company approval status
+                const { data: company } = await supabase
+                    .from("companies")
+                    .select("is_approved")
+                    .eq("user_id", currentUserId)
+                    .maybeSingle()
+                setIsApprovedCompany(!!company?.is_approved)
 
-        // Fetch favorites count
-        const { count: favItemsCount, error: favError } = await supabase
-          .from("favorites")
-          .select("id", { count: "exact" })
-          .eq("user_id", currentUserId)
-        if (favError) console.error("Error fetching favorites count:", favError.message || favError)
-        setFavCount(favItemsCount || 0)
+                // Fetch cart count
+                const { count: cartItemsCount } = await supabase
+                    .from("cart_items")
+                    .select("id", { count: "exact" })
+                    .eq("user_id", currentUserId)
+                setCartCount(cartItemsCount || 0)
+
+                // Fetch favorites count
+                const { count: favItemsCount } = await supabase
+                    .from("favorites")
+                    .select("id", { count: "exact" })
+                    .eq("user_id", currentUserId)
+                setFavCount(favItemsCount || 0)
 
         // --- Real-time subscriptions ---
         cartChannel = supabase
@@ -147,6 +152,11 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
           <Link href="/orders" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
             Orders
           </Link>
+          {isApprovedCompany && (
+            <Link href="/company/dashboard" className="text-gray-900 hover:text-green-600 font-bold transition-colors flex items-center gap-1">
+              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs uppercase tracking-wider">Merchant Dashboard</span>
+            </Link>
+          )}
           {user ? (
             <>
               <Link href="/profile" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
@@ -257,6 +267,15 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
                 >
                   Orders
                 </Link>
+                {isApprovedCompany && (
+                  <Link
+                    href="/company/dashboard"
+                    className="block px-4 py-3 text-green-700 font-bold hover:bg-green-50"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Merchant Dashboard
+                  </Link>
+                )}
                 {user ? (
                   <>
                     <Link

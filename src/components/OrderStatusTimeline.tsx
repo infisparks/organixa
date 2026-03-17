@@ -1,4 +1,4 @@
-import { ShoppingCart, CreditCard, Box, Truck, MapPin } from "lucide-react"
+import { ShoppingCart, CreditCard, Box, Truck, MapPin, RefreshCw } from "lucide-react"
 
 // Define the structure of a single step in the timeline
 interface TimelineStep {
@@ -15,12 +15,12 @@ interface OrderStatusTimelineProps {
 // Timeline steps (SHARED STRUCTURE) - Must be defined here or imported
 const proTimelineSteps: TimelineStep[] = [
     { label: "Order Confirmed", icon: ShoppingCart, status: "confirmed" },
-    { label: "Payment Accepted", icon: CreditCard, status: "payment_accepted" },
-    { label: "Order is Being Prepared", icon: Box, status: "preparing" },
-    { label: "Order Has Been Shipped", icon: Truck, status: "shipped" },
-    { label: "Order Successfully Delivered", icon: MapPin, status: "delivered" },
+    { label: "Processing", icon: RefreshCw, status: "processing" },
+    { label: "Packed", icon: Box, status: "packed" },
+    { label: "Shipped", icon: Truck, status: "shipped" },
+    { label: "Delivered", icon: MapPin, status: "delivered" },
 ]
-const statusOrder = ["confirmed", "payment_accepted", "preparing", "shipped", "delivered"]
+const statusOrder = ["confirmed", "processing", "packed", "shipped", "delivered"]
 
 
 export default function OrderStatusTimeline({ currentStatus }: OrderStatusTimelineProps) {

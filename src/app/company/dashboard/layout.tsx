@@ -65,21 +65,32 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
             const userId = session.user.id
             const { data, error } = await supabase
                 .from("companies")
-                .select("company_name, company_logo_url")
+                .select("company_name, company_logo_url, is_approved")
                 .eq("user_id", userId)
                 .single()
 
             if (error || !data) {
                 console.error("Error fetching company info:", error)
                 toast({
-                    title: "Company Not Found",
-                    description: "Could not load company details. Please ensure your company is registered and approved.",
+                    title: "Company Profile Required",
+                    description: "You must register your company before accessing the dashboard.",
                     variant: "destructive",
                 })
-                router.push("/") // Redirect to home or registration
-            } else {
-                setCompanyInfo(data)
+                router.push("/company-registration") // Assuming this is the registration page
+                return
             }
+
+            if (!data.is_approved) {
+                toast({
+                    title: "Approval Pending",
+                    description: "Your company profile is under review. You will gain access once approved.",
+                    variant: "default",
+                })
+                router.push("/")
+                return
+            }
+
+            setCompanyInfo(data)
             setLoadingCompanyInfo(false)
         }
 

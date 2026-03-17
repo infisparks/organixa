@@ -46,22 +46,22 @@ const getPublicUrlFromPath = (path: string | undefined): string => {
 // =========================================================================
 
 // Define the structure of an item within the order_items JSONB array
-interface OrderItemJson {
+interface OrderItem {
     id: string
     product_id: string
     quantity: number
-    price_at_purchase: number
+    unit_price: number
+    total_price: number
     created_at: string
 }
 
-// Define the structure of an order item with product details
 interface ProductDetailsForOrder {
     id: string
     product_name: string
     product_photo_urls: string[]
 }
 
-interface OrderItemWithProduct extends OrderItemJson {
+interface OrderItemWithProduct extends OrderItem {
     products: ProductDetailsForOrder | null
 }
 
@@ -80,30 +80,22 @@ interface Order {
     area: string | null
     street: string | null
     house_number: string | null
-    order_items: OrderItemJson[]
+    order_items: OrderItem[]
     resolved_order_items?: OrderItemWithProduct[]
 }
-
-// =========================================================================
-//                             UTILITY FUNCTIONS
-// =========================================================================
 
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
         case "pending": return "bg-yellow-100 text-yellow-700 border-yellow-300";
         case "confirmed": return "bg-blue-100 text-blue-700 border-blue-300";
-        case "payment_accepted": return "bg-green-100 text-green-700 border-green-300";
-        case "preparing": return "bg-orange-100 text-orange-700 border-orange-300";
+        case "processing": return "bg-orange-100 text-orange-700 border-orange-300";
+        case "packed": return "bg-green-100 text-green-700 border-green-300";
         case "shipped": return "bg-purple-100 text-purple-700 border-purple-300";
         case "delivered": return "bg-emerald-100 text-emerald-700 border-emerald-300";
         case "cancelled": return "bg-red-100 text-red-700 border-red-300";
         default: return "bg-gray-100 text-gray-700 border-gray-300";
     }
 };
-
-// =========================================================================
-//                             MAIN COMPONENT
-// =========================================================================
 
 export default function MyOrdersPage() {
     const [orders, setOrders] = useState<Order[]>([])
@@ -127,12 +119,13 @@ export default function MyOrdersPage() {
 
         const userId = session.user.id
 
-        // Fetch orders, including the order_items JSONB column
-        const { data: ordersData, error: ordersError } = await supabase
+        // Fetch orders using the new normalized structure
+        const { data: ordersWithItems, error: ordersError } = await supabase
             .from("orders")
-            .select(
-                `id, total_amount, status, purchase_time, customer_name, primary_phone, secondary_phone, country, state, city, pincode, area, street, house_number, order_items`
-            )
+            .select(`
+                *,
+                order_items (*, products (*))
+            `)
             .eq("user_id", userId)
             .order("purchase_time", { ascending: false })
 
@@ -144,51 +137,14 @@ export default function MyOrdersPage() {
             return
         }
 
-        if (!ordersData || ordersData.length === 0) {
-            setOrders([])
-            setLoading(false)
-            return
-        }
-
-        // Extract all unique product_ids from all orders' order_items
-        const allProductIds = new Set<string>()
-        ordersData.forEach((order) => {
-            if (Array.isArray(order.order_items)) {
-                order.order_items.forEach((item: OrderItemJson) => {
-                    allProductIds.add(item.product_id)
-                })
-            }
-        })
-
-        const productsMap = new Map<string, any>()
-        if (allProductIds.size > 0) {
-            const { data: productsData, error: productsError } = await supabase
-                .from("products")
-                .select("id, product_name, product_photo_urls")
-                .in("id", Array.from(allProductIds))
-
-            if (productsError) {
-                console.error("Error fetching product details for orders:", productsError)
-            } else if (productsData) {
-                productsData.forEach((product) => {
-                    productsMap.set(product.id, product)
-                })
-            }
-        }
-
-        // Map product details back to each order's items
-        const resolvedOrders: Order[] = ordersData.map((order) => {
-            const resolvedItems: OrderItemWithProduct[] = Array.isArray(order.order_items)
-                ? order.order_items.map((item: OrderItemJson) => ({
-                    ...item,
-                    products: productsMap.get(item.product_id) || null,
-                }))
-                : []
-            return {
-                ...order,
-                resolved_order_items: resolvedItems,
-            }
-        })
+        // Map data to the Order interface
+        const resolvedOrders: Order[] = (ordersWithItems || []).map((order: any) => ({
+            ...order,
+            resolved_order_items: order.order_items.map((item: any) => ({
+                ...item,
+                products: item.products
+            }))
+        }))
 
         setOrders(resolvedOrders)
         setLoading(false)
@@ -383,7 +339,7 @@ export default function MyOrdersPage() {
                                                             {item.products?.product_name || "Unknown Product"}
                                                         </p>
                                                         <p className="text-sm text-gray-500 font-medium">
-                                                            Qty: {item.quantity} | Unit Price: ₹{item.price_at_purchase.toFixed(2)}
+                                                            Qty: {item.quantity} | Unit Price: ₹{item.unit_price.toFixed(2)}
                                                         </p>
                                                     </div>
                                                 </Link>
@@ -391,7 +347,7 @@ export default function MyOrdersPage() {
                                                 {/* Product Amount and Button Container */}
                                                 <div className="flex flex-col items-end space-y-2 flex-shrink-0">
                                                     <span className="font-extrabold text-lg text-green-700 whitespace-nowrap">
-                                                        ₹{(item.price_at_purchase * item.quantity).toFixed(2)}
+                                                        ₹{(item.unit_price * item.quantity).toFixed(2)}
                                                     </span>
                                                     <Button asChild variant="outline" size="sm" className="h-8 text-xs px-3 border-green-500 text-green-600 hover:bg-green-50">
                                                         <Link href={`/product/${item.product_id}`} className="flex items-center gap-1">

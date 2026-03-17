@@ -220,7 +220,6 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
         currentShippingAddress = newAddress
       } else {
         currentShippingAddress = userAddresses.find((addr) => addr.id === selectedAddressId)
-        // Ensure Lat/Lng is passed if it was just detected even for an existing address
         if (currentShippingAddress && lat && lng) {
             currentShippingAddress.lat = lat
             currentShippingAddress.lng = lng
@@ -229,60 +228,67 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
 
       if (!currentShippingAddress) throw new Error("No address found.")
 
-      // Update Profile
+      // Update Profile with new addresses and contact info
       await supabase.from("user_profiles").update({
           name: userName,
           phone: primaryPhone,
           addresses: updatedAddressesForProfile,
         }).eq("id", currentUserId)
 
-      // Prepare Order Items
-      const orderItemsData = items.map((item) => ({
-        id: uuidv4(),
-        product_id: item.productId,
-        quantity: item.quantity,
-        price_at_purchase: item.price_at_add,
-        created_at: new Date().toISOString(),
-      }))
-
-      // Prepare Order Data (Using flat structure + shipping_address object)
+      // 1. Insert Order first to get ID
       const orderData = {
         user_id: currentUserId,
         total_amount: totalAmount,
         payment_id: response.razorpay_payment_id || null,
         order_id: response.razorpay_order_id || orderId,
         status: "confirmed",
+        payment_status: "paid",
+        payment_method: "razorpay",
         purchase_time: new Date().toISOString(),
         customer_name: userName,
-        
-        // Save the full shipping object (useful for delivery APIs)
-        shipping_address: {
-            name: userName,
-            phone: primaryPhone,
-            addressLine1: currentShippingAddress.addressLine1 || currentShippingAddress.houseNumber,
-            addressLine2: currentShippingAddress.addressLine2 || currentShippingAddress.street,
-            addressLine3: currentShippingAddress.addressLine3 || currentShippingAddress.area,
-            city: currentShippingAddress.city,
-            state: currentShippingAddress.state,
-            pincode: currentShippingAddress.pincode,
-            country: currentShippingAddress.country,
-            lat: currentShippingAddress.lat,
-            lng: currentShippingAddress.lng
-        },
-        order_items: orderItemsData, 
+        primary_phone: primaryPhone,
+        secondary_phone: secondaryPhone || null,
+        country: currentShippingAddress.country,
+        state: currentShippingAddress.state,
+        city: currentShippingAddress.city,
+        pincode: currentShippingAddress.pincode,
+        area: currentShippingAddress.addressLine3 || null, // Mapping area to addressLine3
+        street: currentShippingAddress.addressLine2 || null, // Mapping street to addressLine2
+        house_number: currentShippingAddress.addressLine1 || null, // Mapping house_number to addressLine1
+        shipping_detail: currentShippingAddress, // Still keep JSON for snapshot
+        order_items: items // Legacy JSON field support
       }
 
-      const { error: orderError } = await supabase.from("orders").insert([orderData])
+      const { data: insertedOrder, error: orderError } = await supabase
+        .from("orders")
+        .insert([orderData])
+        .select()
+        .single()
 
       if (orderError) throw orderError
 
-      toast({ title: "Order Successful!", description: "Your order has been placed.", variant: "default" })
+      // 2. Insert into order_items table for scalable architecture
+      const orderItemsToInsert = items.map((item) => ({
+        order_id: insertedOrder.id,
+        product_id: item.productId,
+        quantity: item.quantity,
+        unit_price: item.price_at_add,
+        total_price: item.price_at_add * item.quantity
+      }))
+
+      const { error: itemsError } = await supabase.from("order_items").insert(orderItemsToInsert)
+      if (itemsError) {
+        console.error("Error inserting order items:", itemsError)
+        // We don't throw here as the main order is already created, but we should log it
+      }
+
+      toast({ title: "Order Successful!", description: "Your order has been placed successfully.", variant: "default" })
       setShowRazorpay(false)
       onClose()
       onOrderSuccess()
     } catch (err: any) {
       console.error("Error creating order:", err)
-      toast({ title: "Order Error", description: "Payment successful, but order creation failed.", variant: "destructive" })
+      toast({ title: "Order Error", description: "Payment successful, but order details could not be saved.", variant: "destructive" })
       setShowRazorpay(false)
     }
   }

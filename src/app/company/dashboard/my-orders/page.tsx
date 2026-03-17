@@ -15,12 +15,13 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import Chart from "react-apexcharts" // 💡 CHART IMPORT RE-ADDED
 
-// --- Interface Definitions (Kept the same) ---
-interface OrderItemJson {
+// --- Interface Definitions ---
+interface OrderItem {
     id: string
     product_id: string
     quantity: number
-    price_at_purchase: number
+    unit_price: number
+    total_price: number
     created_at: string
 }
 
@@ -31,7 +32,7 @@ interface ProductDetailsForOrder {
     company_id: string
 }
 
-interface OrderItemWithProduct extends OrderItemJson {
+interface OrderItemWithProduct extends OrderItem {
     products: ProductDetailsForOrder | null
 }
 
@@ -50,19 +51,19 @@ interface Order {
     area: string | null
     street: string | null
     house_number: string | null
-    order_items: OrderItemJson[]
+    order_items: OrderItem[]
     resolved_order_items?: OrderItemWithProduct[]
 }
 
 // Timeline steps for new design
 const proTimelineSteps = [
     { label: "Order Confirmed", icon: ShoppingCart, status: "confirmed" },
-    { label: "Payment Accepted", icon: CreditCard, status: "payment_accepted" },
-    { label: "Order is Being Prepared", icon: Box, status: "preparing" },
-    { label: "Order Has Been Shipped", icon: Truck, status: "shipped" },
-    { label: "Order Successfully Delivered", icon: MapPin, status: "delivered" },
+    { label: "Processing", icon: RefreshCw, status: "processing" },
+    { label: "Packed", icon: Box, status: "packed" },
+    { label: "Shipped", icon: Truck, status: "shipped" },
+    { label: "Delivered", icon: MapPin, status: "delivered" },
 ]
-const statusOrder = ["confirmed", "payment_accepted", "preparing", "shipped", "delivered"]
+const statusOrder = ["confirmed", "processing", "packed", "shipped", "delivered"]
 
 // --- New Component: Update Status Modal ---
 interface UpdateStatusModalProps {
@@ -185,78 +186,32 @@ export default function CompanyMyOrdersPage() {
             return
         }
 
-        // 3. Fetch all orders
-        const { data: allOrdersData, error: allOrdersError } = await supabase
+        // Fetch orders that contain items belonging to this company's products
+        const { data: ordersWithItems, error: fetchError } = await supabase
             .from("orders")
-            .select(
-                `
-                id, total_amount, status, purchase_time, customer_name, primary_phone, secondary_phone, country, state, city, pincode, area, street, house_number, order_items
-                `,
-            )
+            .select(`
+                *,
+                order_items!inner (*, products!inner (*))
+            `)
+            .eq("order_items.products.company_id", companyId)
             .order("purchase_time", { ascending: false })
 
-        if (allOrdersError) {
-            console.error("Error fetching all orders:", allOrdersError)
+        if (fetchError) {
+            console.error("Error fetching company orders:", fetchError)
             setError("Failed to load orders. Please try again.")
             setOrders([])
             setLoading(false)
             return
         }
 
-        // Filter orders to include only those that contain products from this company
-        const filteredCompanyOrders =
-            allOrdersData?.filter((order) =>
-                order.order_items.some((item: OrderItemJson) => companyProductIds.has(item.product_id)),
-            ) || []
-
-        if (filteredCompanyOrders.length === 0) {
-            setOrders([])
-            setLoading(false)
-            return
-        }
-
-        // Extract all unique product_ids from the filtered company orders' order_items
-        const productIdsInCompanyOrders = new Set<string>()
-        filteredCompanyOrders.forEach((order) => {
-            if (Array.isArray(order.order_items)) {
-                order.order_items.forEach((item: OrderItemJson) => {
-                    productIdsInCompanyOrders.add(item.product_id)
-                })
-            }
-        })
-
-        const productsMap = new Map<string, ProductDetailsForOrder>()
-        if (productIdsInCompanyOrders.size > 0) {
-            // Fetch details for all unique products in these orders in one go
-            const { data: productsDetailsData, error: productsDetailsError } = await supabase
-                .from("products")
-                .select("id, product_name, product_photo_urls, company_id")
-                .in("id", Array.from(productIdsInCompanyOrders))
-
-            if (productsDetailsError) {
-                console.error("Error fetching product details for orders:", productsDetailsError)
-            } else if (productsDetailsData) {
-                productsDetailsData.forEach((product) => {
-                    productsMap.set(product.id, product)
-                })
-            }
-        }
-
-        // Map product details back to each order's items and filter to show only company's products
-        const resolvedOrders: Order[] = filteredCompanyOrders.map((order) => {
-            const resolvedItems: OrderItemWithProduct[] = Array.isArray(order.order_items)
-                ? order.order_items
-                    .filter((item: OrderItemJson) => companyProductIds.has(item.product_id)) // Filter here to show only company's products
-                    .map((item: OrderItemJson) => ({
-                        ...item,
-                        products: productsMap.get(item.product_id) || null,
-                    }))
-                : []
-            return {
-                ...order,
-                resolved_order_items: resolvedItems,
-            }
-        })
+        // Map data to the Order interface
+        const resolvedOrders: Order[] = (ordersWithItems || []).map((order: any) => ({
+            ...order,
+            resolved_order_items: order.order_items.map((item: any) => ({
+                ...item,
+                products: item.products
+            }))
+        }))
 
         setOrders(resolvedOrders)
         setLoading(false)
@@ -535,7 +490,7 @@ export default function CompanyMyOrdersPage() {
                                                 <div className="flex justify-between text-sm text-gray-600">
                                                     <span>Total Amount for your products:</span>
                                                     <span className="font-bold text-gray-900">
-                                                        ₹{order.resolved_order_items?.reduce((sum, item) => sum + item.price_at_purchase * item.quantity, 0)?.toFixed(2)}
+                                                        ₹{order.resolved_order_items?.reduce((sum, item) => sum + item.unit_price * item.quantity, 0)?.toFixed(2)}
                                                     </span>
                                                 </div>
                                             </div>
@@ -570,9 +525,9 @@ export default function CompanyMyOrdersPage() {
                                                         </div>
                                                         <div className="flex-grow">
                                                             <Link href={`/product/${item.product_id}`} className="text-md font-medium text-gray-900 hover:text-green-600 line-clamp-1">{item.products?.product_name || "Unknown Product"}</Link>
-                                                            <p className="text-sm text-gray-600">₹{item.price_at_purchase.toFixed(2)} x {item.quantity}</p>
+                                                            <p className="text-sm text-gray-600">₹{item.unit_price.toFixed(2)} x {item.quantity}</p>
                                                         </div>
-                                                        <span className="font-semibold text-gray-900">₹{(item.price_at_purchase * item.quantity).toFixed(2)}</span>
+                                                        <span className="font-semibold text-gray-900">₹{(item.unit_price * item.quantity).toFixed(2)}</span>
                                                     </div>
                                                 ))
                                             )}
