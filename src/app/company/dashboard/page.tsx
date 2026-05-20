@@ -1,17 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { 
-    Loader2, Package, DollarSign, ShoppingCart, 
-    AlertTriangle, TrendingUp, Plus, ArrowRight, 
-    Edit2, ShoppingBag, LayoutGrid
+    Loader2, Package, ShoppingCart, 
+    AlertTriangle, Plus, ArrowRight, 
+    LayoutGrid
 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import Image from "next/image"
-import { useDashboardStore } from "@/store/useDashboardStore"
 import { supabase } from "@/lib/supabase" 
 
 // =========================================================================
@@ -30,48 +27,91 @@ const getPublicUrlFromPath = (path: string | undefined): string => {
 // =========================================================================
 
 export default function DashboardPage() {
-    const { stats, loading, error, fetchStats } = useDashboardStore()
-    const { toast } = useToast()
-    
-    // Local state for fetching recent products to show directly on the dashboard
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [recentProducts, setRecentProducts] = useState<any[]>([])
-    const [fetchingProducts, setFetchingProducts] = useState(true)
+    
+    // Local Metrics State (Bypassing the buggy store)
+    const [metrics, setMetrics] = useState({
+        companyName: "Partner",
+        totalOrders: 0,
+        activeListings: 0,
+        outOfStock: 0
+    })
 
     useEffect(() => {
         const loadDashboardData = async () => {
-            await fetchStats()
-            
-            // Fetch recent products for the dashboard view
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-                const { data: companyData } = await supabase
+            try {
+                const { data: { session } } = await supabase.auth.getSession()
+                
+                if (!session) {
+                    setError("User not authenticated.")
+                    setLoading(false)
+                    return
+                }
+
+                // 1. Get Company Details
+                const { data: companyData, error: companyError } = await supabase
                     .from("companies")
-                    .select("id")
+                    .select("id, company_name")
                     .eq("user_id", session.user.id)
                     .maybeSingle()
 
-                if (companyData) {
-                    const { data: products } = await supabase
-                        .from("products")
-                        .select("*")
-                        .eq("company_id", companyData.id)
-                        .order("created_at", { ascending: false })
-                        .limit(8)
-                    
-                    setRecentProducts(products || [])
+                if (companyError || !companyData) {
+                    setError("Company profile not found.")
+                    setLoading(false)
+                    return
                 }
+
+                // 2. Fetch all products for metrics and recent preview
+                const { data: products } = await supabase
+                    .from("products")
+                    .select("*")
+                    .eq("company_id", companyData.id)
+                    .order("created_at", { ascending: false })
+
+                const productList = products || []
+                setRecentProducts(productList.slice(0, 8)) // Only show 8 on dashboard
+
+                // 3. Calculate Product Metrics
+                const active = productList.filter(p => p.is_approved).length;
+                const outOfStock = productList.filter(p => p.stock_quantity <= 0).length;
+
+                // 4. Fetch Accurate Order Count
+                // We use an inner join to only get orders that contain this company's products
+                const { data: orderData } = await supabase
+                    .from("orders")
+                    .select(`id, order_items!inner (products!inner (company_id))`)
+                    .eq("order_items.products.company_id", companyData.id)
+
+                // Deduplicate orders (in case an order has multiple items from this company)
+                const uniqueOrdersCount = new Set(orderData?.map(o => o.id)).size;
+
+                setMetrics({
+                    companyName: companyData.company_name || "Partner",
+                    totalOrders: uniqueOrdersCount,
+                    activeListings: active,
+                    outOfStock: outOfStock
+                })
+
+            } catch (err: any) {
+                console.error(err)
+                setError("Failed to load dashboard data.")
+            } finally {
+                setLoading(false)
             }
-            setFetchingProducts(false)
         }
 
         loadDashboardData()
-    }, [fetchStats])
+    }, [])
 
-    if (loading || fetchingProducts) {
+    if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#fafafa]">
+            <div className="flex flex-col items-center justify-center min-h-[80vh] bg-[#fafafa]">
                 <Loader2 className="h-6 w-6 animate-spin text-slate-900 mb-3" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest animate-pulse">Loading Workspace</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest animate-pulse">
+                    Loading Workspace
+                </span>
             </div>
         )
     }
@@ -81,7 +121,7 @@ export default function DashboardPage() {
             <div className="p-6 max-w-4xl mx-auto mt-10">
                 <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl shadow-sm text-sm flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    <span className="font-semibold">Error:</span> {error}
+                    <span className="font-semibold">Notice:</span> {error}
                 </div>
             </div>
         )
@@ -90,7 +130,7 @@ export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-[#fafafa] font-sans text-slate-900 pb-20 selection:bg-blue-200">
             
-            {/* Header */}
+            {/* Minimal Sticky Header */}
             <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -99,7 +139,7 @@ export default function DashboardPage() {
                         </div>
                         <div>
                             <h1 className="text-sm font-bold tracking-tight text-slate-900 leading-none">Command Center</h1>
-                            <p className="text-[10px] font-medium text-slate-500 mt-1">Welcome back, {stats?.companyName || "Partner"}</p>
+                            <p className="text-[10px] font-medium text-slate-500 mt-1">Welcome back, {metrics.companyName}</p>
                         </div>
                     </div>
                 </div>
@@ -157,28 +197,17 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* 2. KEY METRICS */}
+                {/* 2. KEY METRICS (Revenue removed, exactly 3 columns) */}
                 <div className="mb-8">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                        <Card className="rounded-xl border-slate-200 shadow-sm bg-white">
-                            <CardContent className="p-4 flex flex-col gap-3">
-                                <div className="flex justify-between items-start">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Revenue</p>
-                                    <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
-                                </div>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-                                    ₹{stats?.totalSalesAmount?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-                                </h3>
-                            </CardContent>
-                        </Card>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        
                         <Card className="rounded-xl border-slate-200 shadow-sm bg-white">
                             <CardContent className="p-4 flex flex-col gap-3">
                                 <div className="flex justify-between items-start">
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Orders</p>
-                                    <ShoppingCart className="h-3.5 w-3.5 text-blue-500" />
+                                    <ShoppingCart className="h-4 w-4 text-blue-500" />
                                 </div>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900">{stats?.totalOrders || 0}</h3>
+                                <h3 className="text-2xl sm:text-3xl font-black text-slate-900">{metrics.totalOrders}</h3>
                             </CardContent>
                         </Card>
 
@@ -186,9 +215,9 @@ export default function DashboardPage() {
                             <CardContent className="p-4 flex flex-col gap-3">
                                 <div className="flex justify-between items-start">
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Items</p>
-                                    <Package className="h-3.5 w-3.5 text-violet-500" />
+                                    <Package className="h-4 w-4 text-emerald-500" />
                                 </div>
-                                <h3 className="text-xl sm:text-2xl font-black text-slate-900">{stats?.activeListings || 0}</h3>
+                                <h3 className="text-2xl sm:text-3xl font-black text-slate-900">{metrics.activeListings}</h3>
                             </CardContent>
                         </Card>
 
@@ -196,13 +225,14 @@ export default function DashboardPage() {
                             <CardContent className="p-4 flex flex-col gap-3">
                                 <div className="flex justify-between items-start">
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Out of Stock</p>
-                                    <AlertTriangle className={`h-3.5 w-3.5 ${(stats?.outOfStockProducts || 0) > 0 ? 'text-amber-500' : 'text-slate-300'}`} />
+                                    <AlertTriangle className={`h-4 w-4 ${metrics.outOfStock > 0 ? 'text-amber-500' : 'text-slate-300'}`} />
                                 </div>
-                                <h3 className={`text-xl sm:text-2xl font-black ${(stats?.outOfStockProducts || 0) > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
-                                    {stats?.outOfStockProducts || 0}
+                                <h3 className={`text-2xl sm:text-3xl font-black ${metrics.outOfStock > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+                                    {metrics.outOfStock}
                                 </h3>
                             </CardContent>
                         </Card>
+
                     </div>
                 </div>
 
@@ -220,7 +250,7 @@ export default function DashboardPage() {
                             <Package className="h-8 w-8 text-slate-300 mb-3" />
                             <p className="text-sm font-bold text-slate-800 mb-1">No products found</p>
                             <p className="text-[11px] text-slate-500 mb-4">You haven't listed any products yet.</p>
-                            <Button asChild className="h-8 px-4 text-xs font-bold bg-slate-900 text-white rounded-lg">
+                            <Button asChild className="h-8 px-4 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800">
                                 <Link href="/company/dashboard/add-product">Add Your First Product</Link>
                             </Button>
                         </div>
