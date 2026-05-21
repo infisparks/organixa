@@ -238,7 +238,7 @@ export default function RegistrationForm() {
         ifsc_code: ifscCode,
         delivery_type: deliveryType,
         estimated_delivery_time: deliveryType === "self" ? estimatedDeliveryTime : null,
-        is_approved: true, // Auto-approved by default as per request
+        is_approved: false, // Default to false, requiring admin approval
       }
 
       // Save the registration data in the Supabase database

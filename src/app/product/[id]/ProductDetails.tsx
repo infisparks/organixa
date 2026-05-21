@@ -148,7 +148,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
 
   // Image Logic
   const images = product.productPhotoUrls ?? []
-  const resolvedImages = images.map(getPublicUrlFromPath).filter(url => url !== "/placeholder.svg");
+  const resolvedImages = images.map(path => getPublicUrlFromPath(path)).filter(url => url !== "/placeholder.svg");
   const [selectedImage, setSelectedImage] = useState(resolvedImages?.[0] ?? "/placeholder.svg")
 
   // --- MAIN USER DATA FETCH ---

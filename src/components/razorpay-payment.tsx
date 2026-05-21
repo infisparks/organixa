@@ -16,6 +16,7 @@ export function useRazorpay() {
     amount: number
     name: string
     description: string
+    order_id?: string
     image?: string
     prefill?: {
       name?: string
@@ -38,6 +39,7 @@ export function useRazorpay() {
       currency: "INR",
       name: options.name,
       description: options.description,
+      order_id: options.order_id,
       image: "", // Use empty string or public URL to avoid CORS/loopback errors in development
       handler: (response: any) => {
         options.onSuccess(response)

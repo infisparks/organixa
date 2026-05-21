@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,9 +29,11 @@ interface Product {
 
 export default function ApprovalsPage() {
   const { toast } = useToast()
+  const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const fetchData = async () => {
@@ -72,7 +75,34 @@ export default function ApprovalsPage() {
   }
 
   useEffect(() => {
-    fetchData()
+    const checkAdminStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push("/login")
+        return
+      }
+
+      const { data: profile, error } = await supabase
+        .from("user_profiles")
+        .select("is_admin")
+        .eq("id", session.user.id)
+        .single()
+
+      if (error || !profile?.is_admin) {
+        toast({
+          title: "Access Denied",
+          description: "You do not have permission to access the approvals dashboard.",
+          variant: "destructive"
+        })
+        router.push("/company/dashboard")
+        return
+      }
+
+      setIsAdmin(true)
+      fetchData()
+    }
+
+    checkAdminStatus()
   }, [])
 
   const handleToggleApproval = async (type: "company" | "product", id: string, currentStatus: boolean) => {
@@ -108,11 +138,11 @@ export default function ApprovalsPage() {
     }
   }
 
-  if (loading) {
+  if (loading || isAdmin === null) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center">
         <Loader2 className="h-10 w-10 animate-spin text-green-600" />
-        <p className="mt-4 text-gray-600 font-medium">Loading approval requests...</p>
+        <p className="mt-4 text-gray-600 font-medium">Checking authorization...</p>
       </div>
     )
   }

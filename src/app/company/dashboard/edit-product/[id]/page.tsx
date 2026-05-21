@@ -45,8 +45,31 @@ interface ProductDataFromDB {
  */
 const getPathFromPublicUrl = (url: string | undefined | null): string | null => {
   if (!url) return null;
-  const parts = url.split("product-media/");
-  return parts.length > 1 ? parts[1] : null;
+  
+  // If it's a full URL, split by bucket name
+  if (url.includes("product-media/")) {
+    const parts = url.split("product-media/");
+    return parts.length > 1 ? decodeURIComponent(parts[1]) : null;
+  }
+  
+  // If it's a full URL of another storage bucket
+  if (url.startsWith("http") && url.includes("/public/")) {
+    const parts = url.split("/public/");
+    if (parts.length > 1) {
+      const pathWithBucket = parts[1];
+      const firstSlashIdx = pathWithBucket.indexOf("/");
+      if (firstSlashIdx !== -1) {
+        return decodeURIComponent(pathWithBucket.substring(firstSlashIdx + 1));
+      }
+    }
+  }
+  
+  // If it is already a relative path (doesn't start with http)
+  if (!url.startsWith("http")) {
+    return decodeURIComponent(url);
+  }
+  
+  return null;
 };
 
 export default function EditProductPage() {
@@ -125,7 +148,7 @@ export default function EditProductPage() {
         } else {
           // Convert stored paths to full public URLs
           const existingProductPhotoUrls = productData.product_photo_urls
-            ? productData.product_photo_urls.map(getPublicUrlFromPath).filter(url => url !== "")
+            ? productData.product_photo_urls.map(path => getPublicUrlFromPath(path)).filter(url => url !== "")
             : [];
 
           const existingProductVideoUrl = productData.product_video_url
@@ -243,7 +266,7 @@ export default function EditProductPage() {
       if (newVideo) {
         finalProductVideoPath = await uploadFile(newVideo, "product-media", "videos", companyId)
         if (existingVideoPath) await supabase.storage.from("product-media").remove([existingVideoPath])
-      } else if (newVideo === null && initialProductData?.existingProductVideoUrl) {
+      } else if (newVideo === null && !data.existingProductVideoUrl && initialProductData?.existingProductVideoUrl) {
         if (existingVideoPath) await supabase.storage.from("product-media").remove([existingVideoPath])
         finalProductVideoPath = null
       } else {

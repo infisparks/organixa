@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { Heart, Filter, Loader2, ArrowRight, Sparkles } from "lucide-react"
+import { Heart, Filter, Loader2, ArrowRight, Sparkles, Phone, Mail, CheckCircle2, ShieldCheck, Award, ChevronRight } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -422,6 +422,156 @@ export default function Home() {
               </Button>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* 🌿 GrowGenics Distributor Opportunity Section */}
+      <section className="py-16 sm:py-24 bg-gradient-to-b from-[#fafafa] to-slate-100 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Header */}
+          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16 space-y-4">
+            <span className="bg-emerald-100 text-emerald-800 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-spin" /> GrowGenics Distributor Opportunity
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              Powered by <span className="text-emerald-600">Organicza</span> – Gateway of Wellness
+            </h2>
+            <p className="text-base sm:text-lg text-slate-600 font-medium max-w-2xl mx-auto">
+              💰 Earn More with a High-Demand Nutrition Brand!
+            </p>
+          </div>
+
+          {/* Grid Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* Left Side: Benefits (7 Cols) */}
+            <div className="lg:col-span-7 space-y-6 flex flex-col justify-between">
+              
+              {/* What You Get Card */}
+              <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-sm flex-grow">
+                <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2 border-b pb-3">
+                  <span className="text-emerald-600 bg-emerald-50 p-1.5 rounded-lg">🔥</span> What You Get:
+                </h3>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { title: "Up to 40% Margin", desc: "Highly lucrative profit shares in the segment." },
+                    { title: "High Repeat Demand Product", desc: "Customers love the results and repurchase monthly." },
+                    { title: "Clean-Label Advantage", desc: "No chemicals, no added sugar - pure nutrition." },
+                    { title: "Premium Brand Positioning", desc: "Elegant aesthetics and top-tier packaging." },
+                    { title: "Fast Growing Health Segment", desc: "Tap into the booming daily wellness market." }
+                  ].map((item, idx) => (
+                    <li key={idx} className="flex gap-3 items-start">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-slate-800 text-xs sm:text-sm">{item.title}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{item.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Why GrowGenics Card */}
+              <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-sm flex-grow mt-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2 border-b pb-3">
+                  <span className="text-emerald-600 bg-emerald-50 p-1.5 rounded-lg">🌾</span> Why GrowGenics?
+                </h3>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { title: "Rich Nutrition Profile", desc: "Packed with Protein, Fiber, Calcium, Iron & Multivitamins." },
+                    { title: "Functional Health Benefits", desc: "Supports natural energy, immunity & healthy growth." },
+                    { title: "Family-Friendly daily nutrition", desc: "Suitable for adults, seniors, and active kids alike." },
+                    { title: "Trusted Clean-Label Product", desc: "Pure formulation transparency you can proudly recommend." }
+                  ].map((item, idx) => (
+                    <li key={idx} className="flex gap-3 items-start">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-slate-800 text-xs sm:text-sm">{item.title}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{item.desc}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+            </div>
+
+            {/* Right Side: Who Can Apply & Contact (5 Cols) */}
+            <div className="lg:col-span-5 space-y-6 flex flex-col justify-between">
+              
+              {/* Who Can Apply & Limited Area */}
+              <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-sm space-y-6 flex-grow">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b pb-3">
+                  <span className="text-emerald-600 bg-emerald-50 p-1.5 rounded-lg">📈</span> Who Can Apply?
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    "FMCG Distributors",
+                    "Medical & General Store Owners",
+                    "Health Product Sellers",
+                    "Entrepreneurs"
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <ChevronRight className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="bg-amber-50/80 border border-amber-200/50 p-4 rounded-xl space-y-1.5">
+                  <p className="text-xs text-amber-800 font-bold flex items-center gap-1">
+                    ⚡ Limited Area Distribution Available
+                  </p>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    👉 Secure your area before others! Exclusivity rights are granted on a first-come, first-served basis.
+                  </p>
+                </div>
+              </div>
+
+              {/* Contact Now Card */}
+              <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-2xl shadow-md space-y-5">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-emerald-400" /> Contact Now
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <a href="tel:7020977280" className="flex items-center gap-3 hover:text-emerald-400 transition-colors group">
+                    <div className="bg-slate-800 p-2.5 rounded-xl border border-slate-700 group-hover:scale-105 transition-transform">
+                      <Phone className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Call / WhatsApp</p>
+                      <p className="text-sm font-bold">+91 70209 77280</p>
+                    </div>
+                  </a>
+                  
+                  <a href="mailto:organicza2025@gmail.com" className="flex items-center gap-3 hover:text-emerald-400 transition-colors group">
+                    <div className="bg-slate-800 p-2.5 rounded-xl border border-slate-700 group-hover:scale-105 transition-transform">
+                      <Mail className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Email</p>
+                      <p className="text-sm font-bold truncate max-w-[160px] sm:max-w-none">organicza2025@gmail.com</p>
+                    </div>
+                  </a>
+                </div>
+              </div>
+
+              {/* Formula Highlight */}
+              <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 text-white p-5 rounded-2xl text-center shadow-md relative overflow-hidden">
+                <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-4">
+                  <Sparkles className="w-20 h-20" />
+                </div>
+                <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest mb-0.5">🔥 Closing Formula</p>
+                <p className="text-lg sm:text-xl font-extrabold italic tracking-tight">
+                  “High Margin + High Demand = High Profit”
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
       </section>
 

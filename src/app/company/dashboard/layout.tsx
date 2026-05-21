@@ -36,6 +36,7 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
 
     const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null)
     const [loadingCompanyInfo, setLoadingCompanyInfo] = useState(true)
+    const [isAdmin, setIsAdmin] = useState(false)
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
     const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false) // State for mobile sheet
 
@@ -64,11 +65,32 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
             }
 
             const userId = session.user.id
+
+            // Check if user is admin
+            const { data: profile } = await supabase
+                .from("user_profiles")
+                .select("is_admin")
+                .eq("id", userId)
+                .single()
+
+            const isUserAdmin = !!profile?.is_admin
+            setIsAdmin(isUserAdmin)
+
             const { data, error } = await supabase
                 .from("companies")
                 .select("company_name, company_logo_url, is_approved")
                 .eq("user_id", userId)
                 .single()
+
+            if (isUserAdmin) {
+                if (data) {
+                    setCompanyInfo(data)
+                } else {
+                    setCompanyInfo({ company_name: "Admin Panel", company_logo_url: null })
+                }
+                setLoadingCompanyInfo(false)
+                return
+            }
 
             if (error || !data) {
                 console.error("Error fetching company info:", error)
@@ -77,17 +99,12 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
                     description: "You must register your company before accessing the dashboard.",
                     variant: "destructive",
                 })
-                router.push("/company-registration") // Assuming this is the registration page
+                router.push("/company/registration") // Assuming this is the registration page
                 return
             }
 
             if (!data.is_approved) {
-                toast({
-                    title: "Approval Pending",
-                    description: "Your company profile is under review. You will gain access once approved.",
-                    variant: "default",
-                })
-                router.push("/")
+                router.push("/company/pending")
                 return
             }
 
@@ -157,16 +174,15 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
             href: "/company/dashboard/my-orders",
             icon: ShoppingBag,
         },
-        {
-            name: "Approvals",
-            href: "/company/dashboard/approvals",
-            icon: ListChecks,
-        },
-        // {
-        //     name: "Settings", // 💡 ADDED Settings back for completeness, matching the previous commented item
-        //     href: "/company/dashboard/settings",
-        //     icon: Settings,
-        // },
+        ...(isAdmin
+            ? [
+                  {
+                      name: "Approvals",
+                      href: "/company/dashboard/approvals",
+                      icon: ListChecks,
+                  },
+              ]
+            : []),
     ]
 
     if (loadingCompanyInfo) {

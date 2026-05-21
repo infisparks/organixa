@@ -101,17 +101,17 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">Contact Us</h3>
             <address className="not-italic space-y-2 text-sm">
-              <p>123 Organic Lane, Green City, GC 12345</p>
+              <p>Organicza – Gateway of Wellness</p>
               <p className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-green-500" />
-                <a href="tel:+1234567890" className="hover:text-white transition-colors">
-                  +1 (234) 567-890
+                <a href="tel:7020977280" className="hover:text-white transition-colors">
+                  +91 70209 77280
                 </a>
               </p>
               <p className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-green-500" />
-                <a href="mailto:info@organicza.com" className="hover:text-white transition-colors">
-                  info@organicza.com
+                <a href="mailto:organicza2025@gmail.com" className="hover:text-white transition-colors">
+                  organicza2025@gmail.com
                 </a>
               </p>
             </address>

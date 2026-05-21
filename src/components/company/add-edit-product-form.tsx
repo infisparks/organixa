@@ -367,6 +367,9 @@ export function AddEditProductForm({
     }
     setError("") // Clear previous errors
 
+    data.existingProductVideoUrl = existingVideoUrl
+    data.existingProductPhotoUrls = existingImages
+
     await onSave(data, selectedImages, selectedVideo, removedImageUrls)
   }
 

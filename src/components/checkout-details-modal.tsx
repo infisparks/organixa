@@ -180,10 +180,32 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
     }
 
     setLoading(true)
-    const tempOrderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`
-    setOrderId(tempOrderId)
-    setShowRazorpay(true)
-    setLoading(false)
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke("create-razorpay-order", {
+        body: { amount: totalAmount },
+      })
+
+      if (functionError) {
+        throw new Error(functionError.message || "Failed to initialize payment order.")
+      }
+
+      if (!data || !data.orderId) {
+        throw new Error("Did not receive a valid order ID from payment gateway.")
+      }
+
+      setOrderId(data.orderId)
+      setShowRazorpay(true)
+    } catch (err: any) {
+      console.error("Order initiation error:", err)
+      setError(err.message || "Failed to initiate payment. Please try again.")
+      toast({
+        title: "Payment Error",
+        description: err.message || "Could not start payment transaction.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handlePaymentSuccess = async (response: any) => {
@@ -235,52 +257,34 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
           addresses: updatedAddressesForProfile,
         }).eq("id", currentUserId)
 
-      // 1. Insert Order first to get ID
-      const orderData = {
-        user_id: currentUserId,
-        total_amount: totalAmount,
-        payment_id: response.razorpay_payment_id || null,
-        order_id: response.razorpay_order_id || orderId,
-        status: "confirmed",
-        payment_status: "paid",
-        payment_method: "razorpay",
-        purchase_time: new Date().toISOString(),
-        customer_name: userName,
-        primary_phone: primaryPhone,
-        secondary_phone: secondaryPhone || null,
-        country: currentShippingAddress.country,
-        state: currentShippingAddress.state,
-        city: currentShippingAddress.city,
-        pincode: currentShippingAddress.pincode,
-        area: currentShippingAddress.addressLine3 || null, // Mapping area to addressLine3
-        street: currentShippingAddress.addressLine2 || null, // Mapping street to addressLine2
-        house_number: currentShippingAddress.addressLine1 || null, // Mapping house_number to addressLine1
-        shipping_detail: currentShippingAddress, // Still keep JSON for snapshot
-        order_items: items // Legacy JSON field support
-      }
+      // Call database RPC to verify signature and save order securely
+      const { data: orderIdFromRpc, error: rpcError } = await supabase.rpc(
+        "verify_razorpay_payment_and_create_order",
+        {
+          p_order_id: response.razorpay_order_id || orderId,
+          p_payment_id: response.razorpay_payment_id,
+          p_signature: response.razorpay_signature,
+          p_total_amount: totalAmount,
+          p_customer_name: userName,
+          p_primary_phone: primaryPhone,
+          p_secondary_phone: secondaryPhone || null,
+          p_country: currentShippingAddress.country,
+          p_state: currentShippingAddress.state,
+          p_city: currentShippingAddress.city,
+          p_pincode: currentShippingAddress.pincode,
+          p_area: currentShippingAddress.addressLine3 || null,
+          p_street: currentShippingAddress.addressLine2 || null,
+          p_house_number: currentShippingAddress.addressLine1 || null,
+          p_location: (lat && lng) ? { lat, lng } : null,
+          p_shipping_detail: currentShippingAddress,
+          p_items: items,
+          p_payment_method: "razorpay",
+          p_shipping_cost: shippingFee,
+          p_tax_amount: 0,
+        }
+      )
 
-      const { data: insertedOrder, error: orderError } = await supabase
-        .from("orders")
-        .insert([orderData])
-        .select()
-        .single()
-
-      if (orderError) throw orderError
-
-      // 2. Insert into order_items table for scalable architecture
-      const orderItemsToInsert = items.map((item) => ({
-        order_id: insertedOrder.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-        unit_price: item.price_at_add,
-        total_price: item.price_at_add * item.quantity
-      }))
-
-      const { error: itemsError } = await supabase.from("order_items").insert(orderItemsToInsert)
-      if (itemsError) {
-        console.error("Error inserting order items:", itemsError)
-        // We don't throw here as the main order is already created, but we should log it
-      }
+      if (rpcError) throw rpcError
 
       toast({ title: "Order Successful!", description: "Your order has been placed successfully.", variant: "default" })
       setShowRazorpay(false)
@@ -288,7 +292,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
       onOrderSuccess()
     } catch (err: any) {
       console.error("Error creating order:", err)
-      toast({ title: "Order Error", description: "Payment successful, but order details could not be saved.", variant: "destructive" })
+      toast({ title: "Order Error", description: err.message || "Payment successful, but order details could not be saved.", variant: "destructive" })
       setShowRazorpay(false)
     }
   }
@@ -590,6 +594,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
       {showRazorpay && (
         <RazorpayPayment
           amount={totalAmount}
+          order_id={orderId}
           name={userName || "Customer"}
           description={`Order from organicza`}
           image="/placeholder.svg"

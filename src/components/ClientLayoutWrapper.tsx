@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, ReactNode, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import AddressFormModal from "./AddressFormModal";
@@ -44,8 +44,10 @@ export default function ClientLayoutWrapper({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasCompany, setHasCompany] = useState(false);
 
   const pathname = usePathname();
+  const router = useRouter();
   const hasFetchedOnce = useRef(false);
 
   /* ===================== PROFILE CHECK ===================== */
@@ -72,14 +74,43 @@ export default function ClientLayoutWrapper({
 
     setUser(session.user);
 
-    // Optimization: If we already have a profile and this is a silent update,
-    // we can skip the DB call if you want, or just let it run in background.
-    // For now, we let it run to keep data fresh, but it won't trigger a loader.
+    // Fetch user profile
     const { data: userProfile, error } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("id", session.user.id)
       .single();
+
+    // Fetch company to see if user is registered as a company/merchant
+    const { data: company } = await supabase
+      .from("companies")
+      .select("id, is_approved")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+
+    const userHasCompany = !!company;
+    const isCompanyApproved = company?.is_approved || false;
+
+    // Handle Global Company Redirection
+    if (userHasCompany) {
+      if (!isCompanyApproved) {
+        // Pending approval -> redirect to /company/pending if not already there
+        if (pathname !== "/company/pending" && !pathname.startsWith("/auth/") && !pathname.startsWith("/api/")) {
+          router.push("/company/pending");
+          setLoading(false);
+          hasFetchedOnce.current = true;
+          return;
+        }
+      } else {
+        // Approved company -> must be on /company/ dashboard path, otherwise redirect to dashboard
+        if (!pathname.startsWith("/company/") && !pathname.startsWith("/auth/") && !pathname.startsWith("/api/")) {
+          router.push("/company/dashboard");
+          setLoading(false);
+          hasFetchedOnce.current = true;
+          return;
+        }
+      }
+    }
 
     if (error) {
       console.error("Profile fetch error:", error.message);
@@ -91,7 +122,7 @@ export default function ClientLayoutWrapper({
     if (userProfile) {
       const typedProfile = userProfile as UserProfile;
       setProfile(typedProfile);
-      validateProfileCompletion(typedProfile);
+      validateProfileCompletion(typedProfile, userHasCompany);
     }
 
     hasFetchedOnce.current = true;
@@ -100,7 +131,7 @@ export default function ClientLayoutWrapper({
 
   /* ===================== PROFILE VALIDATION ===================== */
 
-  const validateProfileCompletion = (profileData: UserProfile) => {
+  const validateProfileCompletion = (profileData: UserProfile, userHasCompany: boolean) => {
     const hasName = profileData.name?.trim() !== "";
     const hasPhone = profileData.phone?.trim() !== "";
     const hasAddressWithPincode =
@@ -108,11 +139,11 @@ export default function ClientLayoutWrapper({
         (addr) => addr.pincode?.trim() !== ""
       ) || false;
 
-    const isCompanyRoute = pathname.startsWith("/company/");
+    const isCompanyRoute = pathname.startsWith("/company/") || pathname === "/company-registration";
     const needsProfileCompletion =
       !hasName || !hasPhone || !hasAddressWithPincode;
 
-    if (needsProfileCompletion && !isCompanyRoute) {
+    if (needsProfileCompletion && !isCompanyRoute && !userHasCompany) {
       setIsModalOpen(true);
     } else {
       setIsModalOpen(false);
@@ -158,7 +189,7 @@ export default function ClientLayoutWrapper({
 
   const handleAddressUpdated = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
-    validateProfileCompletion(updatedProfile);
+    validateProfileCompletion(updatedProfile, hasCompany);
   };
 
   /* ===================== LOADER (FIRST LOAD ONLY) ===================== */
