@@ -138,7 +138,7 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
           {/* Logo (Main Header) - Hide Leaf icon on mobile (md:flex) */}
           <Link href="/" className="flex items-center gap-2 group">
             <Leaf className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 md:flex hidden group-hover:rotate-12 transition-transform duration-300" />
-            <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">organicxa</span>
+            <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">organicza</span>
           </Link>
         </div>
 
