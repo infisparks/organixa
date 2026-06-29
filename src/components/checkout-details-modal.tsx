@@ -26,7 +26,7 @@ interface CheckoutDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   items: CheckoutItem[]
-  onOrderSuccess: () => void
+  onOrderSuccess: (orderId: string) => void
 }
 
 // Updated Address Interface
@@ -57,6 +57,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
   const [error, setError] = useState<string | null>(null)
   const [showRazorpay, setShowRazorpay] = useState(false)
   const [orderId, setOrderId] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay")
 
   // Form states
   const [userName, setUserName] = useState("")
@@ -82,6 +83,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
   const [userAddresses, setUserAddresses] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
   const [showNewAddressForm, setShowNewAddressForm] = useState(false)
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
 
   const subtotal = items.reduce((sum, item) => sum + item.price_at_add * item.quantity, 0)
   const shippingFee = subtotal > 0 && subtotal < 1000 ? 99 : 0
@@ -180,27 +182,131 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
     }
 
     setLoading(true)
+
     try {
-      const { data, error: functionError } = await supabase.functions.invoke("create-razorpay-order", {
-        body: { amount: totalAmount },
-      })
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUserId = session?.user?.id
 
-      if (functionError) {
-        throw new Error(functionError.message || "Failed to initialize payment order.")
+      if (!currentUserId) {
+        throw new Error("You must be logged in to place an order.")
       }
 
-      if (!data || !data.orderId) {
-        throw new Error("Did not receive a valid order ID from payment gateway.")
+      // Prepare shipping address and updated addresses for profile
+      let currentShippingAddress: Address | undefined
+      let updatedAddressesForProfile: Address[] = [...userAddresses]
+
+      if (selectedAddressId === "new") {
+        const newAddress: Address = {
+          id: uuidv4(),
+          name: `${addressLine1}, ${city}`,
+          addressLine1,
+          addressLine2: addressLine2 || undefined,
+          addressLine3: addressLine3 || undefined,
+          city,
+          state,
+          pincode,
+          country,
+          primaryPhone,
+          secondaryPhone: secondaryPhone || undefined,
+          isDefault: true,
+          lat: lat || undefined,
+          lng: lng || undefined,
+        }
+
+        updatedAddressesForProfile = updatedAddressesForProfile.map((addr) => ({ ...addr, isDefault: false }))
+        updatedAddressesForProfile.push(newAddress)
+        currentShippingAddress = newAddress
+      } else if (editingAddressId) {
+        updatedAddressesForProfile = userAddresses.map((addr) => {
+          if (addr.id === editingAddressId) {
+            return {
+              ...addr,
+              name: `${addressLine1}, ${city}`,
+              addressLine1,
+              addressLine2: addressLine2 || undefined,
+              addressLine3: addressLine3 || undefined,
+              city,
+              state,
+              pincode,
+              country,
+              primaryPhone,
+              secondaryPhone: secondaryPhone || undefined,
+              lat: lat || undefined,
+              lng: lng || undefined,
+            }
+          }
+          return addr;
+        })
+        currentShippingAddress = updatedAddressesForProfile.find(addr => addr.id === editingAddressId)
+      } else {
+        currentShippingAddress = userAddresses.find((addr) => addr.id === selectedAddressId)
+        if (currentShippingAddress && lat && lng) {
+            currentShippingAddress.lat = lat
+            currentShippingAddress.lng = lng
+        }
       }
 
-      setOrderId(data.orderId)
-      setShowRazorpay(true)
+      if (!currentShippingAddress) throw new Error("No address found.")
+
+      if (paymentMethod === "cod") {
+        // Update Profile with addresses and contact info
+        await supabase.from("user_profiles").update({
+            name: userName,
+            phone: primaryPhone,
+            addresses: updatedAddressesForProfile,
+          }).eq("id", currentUserId)
+
+        // Call database RPC to create COD order
+        const { data: orderIdFromRpc, error: rpcError } = await supabase.rpc(
+          "create_cod_order",
+          {
+            p_total_amount: totalAmount,
+            p_customer_name: userName,
+            p_primary_phone: primaryPhone,
+            p_secondary_phone: secondaryPhone || null,
+            p_country: currentShippingAddress.country,
+            p_state: currentShippingAddress.state,
+            p_city: currentShippingAddress.city,
+            p_pincode: currentShippingAddress.pincode,
+            p_area: currentShippingAddress.addressLine3 || null,
+            p_street: currentShippingAddress.addressLine2 || null,
+            p_house_number: currentShippingAddress.addressLine1 || null,
+            p_location: (lat && lng) ? { lat, lng } : null,
+            p_shipping_detail: currentShippingAddress,
+            p_items: items,
+            p_shipping_cost: shippingFee,
+            p_tax_amount: 0,
+          }
+        )
+
+        if (rpcError) throw rpcError
+
+        toast({ title: "Order Successful!", description: "Your order has been placed successfully.", variant: "default" })
+        onClose()
+        onOrderSuccess(orderIdFromRpc)
+      } else {
+        // Online payment (Razorpay)
+        const { data, error: functionError } = await supabase.functions.invoke("create-razorpay-order", {
+          body: { amount: totalAmount },
+        })
+
+        if (functionError) {
+          throw new Error(functionError.message || "Failed to initialize payment order.")
+        }
+
+        if (!data || !data.orderId) {
+          throw new Error("Did not receive a valid order ID from payment gateway.")
+        }
+
+        setOrderId(data.orderId)
+        setShowRazorpay(true)
+      }
     } catch (err: any) {
-      console.error("Order initiation error:", err)
-      setError(err.message || "Failed to initiate payment. Please try again.")
+      console.error("Order placement error:", err)
+      setError(err.message || "Failed to place order. Please try again.")
       toast({
-        title: "Payment Error",
-        description: err.message || "Could not start payment transaction.",
+        title: "Order Error",
+        description: err.message || "Could not complete order transaction.",
         variant: "destructive",
       })
     } finally {
@@ -240,6 +346,28 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
         updatedAddressesForProfile = updatedAddressesForProfile.map((addr) => ({ ...addr, isDefault: false }))
         updatedAddressesForProfile.push(newAddress)
         currentShippingAddress = newAddress
+      } else if (editingAddressId) {
+        updatedAddressesForProfile = userAddresses.map((addr) => {
+          if (addr.id === editingAddressId) {
+            return {
+              ...addr,
+              name: `${addressLine1}, ${city}`,
+              addressLine1,
+              addressLine2: addressLine2 || undefined,
+              addressLine3: addressLine3 || undefined,
+              city,
+              state,
+              pincode,
+              country,
+              primaryPhone,
+              secondaryPhone: secondaryPhone || undefined,
+              lat: lat || undefined,
+              lng: lng || undefined,
+            }
+          }
+          return addr;
+        })
+        currentShippingAddress = updatedAddressesForProfile.find(addr => addr.id === editingAddressId)
       } else {
         currentShippingAddress = userAddresses.find((addr) => addr.id === selectedAddressId)
         if (currentShippingAddress && lat && lng) {
@@ -289,7 +417,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
       toast({ title: "Order Successful!", description: "Your order has been placed successfully.", variant: "default" })
       setShowRazorpay(false)
       onClose()
-      onOrderSuccess()
+      onOrderSuccess(orderIdFromRpc)
     } catch (err: any) {
       console.error("Error creating order:", err)
       toast({ title: "Order Error", description: err.message || "Payment successful, but order details could not be saved.", variant: "destructive" })
@@ -304,6 +432,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
 
   const handleAddressSelectionChange = (value: string) => {
     setSelectedAddressId(value)
+    setEditingAddressId(null)
     if (value === "new") {
       setShowNewAddressForm(true)
       // Clear fields
@@ -386,44 +515,71 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
 
           {/* Address Selection */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Delivery Address</h3>
+            <h3 className="text-base font-semibold text-gray-950">Delivery Address</h3>
             {userAddresses.length > 0 && (
               <RadioGroup onValueChange={handleAddressSelectionChange} value={selectedAddressId || ""}>
                 <div className="grid grid-cols-1 gap-3">
                   {userAddresses.map((address) => (
-                    <Label
+                    <div
                       key={address.id}
-                      htmlFor={`address-${address.id}`}
-                      className="flex items-center space-x-2 p-3 border rounded-md cursor-pointer hover:bg-gray-50 relative"
+                      className={`flex justify-between items-center p-3 border rounded-xl hover:bg-slate-50 transition-all ${
+                        selectedAddressId === address.id ? "border-purple-600 bg-purple-50/5" : "border-gray-200"
+                      }`}
                     >
-                      <RadioGroupItem value={address.id} id={`address-${address.id}`} />
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {address.name} {address.isDefault && "(Default)"}
-                        </span>
-                        <span className="text-sm text-gray-600 truncate max-w-[400px]">
-                           {/* Handle display for both old and new format */}
-                          {address.addressLine1 || address.houseNumber}, {address.addressLine2 || address.street} {address.addressLine3 || address.area}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {address.city}, {address.state} - {address.pincode}
-                        </span>
-                        {/* Show if location data exists */}
-                        {(address.lat || (selectedAddressId === address.id && lat)) && (
-                           <span className="text-xs text-emerald-600 flex items-center mt-1">
-                             <Navigation className="w-3 h-3 mr-1"/> GPS Location Attached
-                           </span>
-                        )}
-                      </div>
-                    </Label>
+                      <Label
+                        htmlFor={`address-${address.id}`}
+                        className="flex items-center space-x-3 cursor-pointer flex-grow"
+                      >
+                        <RadioGroupItem value={address.id} id={`address-${address.id}`} className="text-purple-600 border-purple-600 focus-visible:ring-purple-500" />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-sm text-gray-950">
+                            {address.name} {address.isDefault && "(Default)"}
+                          </span>
+                          <span className="text-xs text-slate-500 truncate max-w-[320px] sm:max-w-[400px]">
+                            {address.addressLine1 || address.houseNumber}, {address.addressLine2 || address.street} {address.addressLine3 || address.area}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {address.city}, {address.state} - {address.pincode}
+                          </span>
+                          {(address.lat || (selectedAddressId === address.id && lat)) && (
+                            <span className="text-[10px] text-emerald-600 flex items-center mt-1 font-medium">
+                              <Navigation className="w-3 h-3 mr-1"/> GPS Location Attached
+                            </span>
+                          )}
+                        </div>
+                      </Label>
+                      
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg flex items-center gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAddressId(address.id);
+                          setEditingAddressId(address.id);
+                          fillFormWithAddress(address, primaryPhone);
+                          setShowNewAddressForm(true);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Edit
+                      </Button>
+                    </div>
                   ))}
-                  <Label
-                    htmlFor="address-new"
-                    className="flex items-center space-x-2 p-3 border rounded-md cursor-pointer hover:bg-gray-50"
+                  <div
+                    className={`flex items-center p-3 border rounded-xl hover:bg-slate-50 transition-all ${
+                      selectedAddressId === "new" ? "border-purple-600 bg-purple-50/5" : "border-gray-200"
+                    }`}
                   >
-                    <RadioGroupItem value="new" id="address-new" />
-                    <span className="font-medium">Add New Address</span>
-                  </Label>
+                    <Label
+                      htmlFor="address-new"
+                      className="flex items-center space-x-3 cursor-pointer w-full"
+                    >
+                      <RadioGroupItem value="new" id="address-new" className="text-purple-600 border-purple-600 focus-visible:ring-purple-500" />
+                      <span className="font-semibold text-sm text-gray-950">Add New Address</span>
+                    </Label>
+                  </div>
                 </div>
               </RadioGroup>
             )}
@@ -433,7 +589,9 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
           {(showNewAddressForm || userAddresses.length === 0) && (
             <div className="space-y-4 border-t pt-4 mt-4">
               <div className="flex justify-between items-center">
-                <h4 className="text-md font-semibold text-gray-800">New Address Details</h4>
+                <h4 className="text-sm font-bold text-gray-900">
+                  {editingAddressId ? "Edit Address Details" : "New Address Details"}
+                </h4>
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -530,36 +688,86 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 pt-2">
-                  <Checkbox
-                    id="set-default-address"
-                    checked={selectedAddressId === "new"}
-                    onCheckedChange={(checked: boolean) => {
-                      if (checked) setSelectedAddressId("new")
-                    }}
-                  />
-                  <Label htmlFor="set-default-address">Set as Default Address</Label>
-                </div>
+                {!editingAddressId && (
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="set-default-address"
+                      checked={selectedAddressId === "new"}
+                      onCheckedChange={(checked: boolean) => {
+                        if (checked) setSelectedAddressId("new")
+                      }}
+                    />
+                    <Label htmlFor="set-default-address">Set as Default Address</Label>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
+          {/* Payment Method Selector */}
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-base font-semibold text-gray-900">Payment Method</h3>
+            <RadioGroup onValueChange={(val) => setPaymentMethod(val as "razorpay" | "cod")} value={paymentMethod}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Label
+                  htmlFor="payment-online"
+                  className={`flex items-center space-x-3 p-4 border rounded-xl cursor-pointer hover:bg-slate-50 transition-all ${
+                    paymentMethod === "razorpay" ? "border-purple-600 bg-purple-50/20" : "border-gray-200"
+                  }`}
+                >
+                  <RadioGroupItem value="razorpay" id="payment-online" className="text-purple-600 border-purple-600 focus-visible:ring-purple-500" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm text-gray-950">Pay Online</span>
+                    <span className="text-xs text-gray-500">Cards, UPI, Netbanking</span>
+                  </div>
+                </Label>
+                <Label
+                  htmlFor="payment-cod"
+                  className={`flex items-center space-x-3 p-4 border rounded-xl cursor-pointer hover:bg-slate-50 transition-all ${
+                    paymentMethod === "cod" ? "border-purple-600 bg-purple-50/20" : "border-gray-200"
+                  }`}
+                >
+                  <RadioGroupItem value="cod" id="payment-cod" className="text-purple-600 border-purple-600 focus-visible:ring-purple-500" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm text-gray-950">Cash on Delivery</span>
+                    <span className="text-xs text-gray-500">Pay cash on delivery</span>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {/* Pay Summary Alert Box */}
+            <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
+              paymentMethod === "cod" ? "bg-amber-50/60 border-amber-200 text-amber-800" : "bg-purple-50/30 border-purple-100 text-purple-800"
+            }`}>
+              {paymentMethod === "cod" ? (
+                <p>
+                  <span className="font-bold">Cash on Delivery selected:</span> You will pay exactly <span className="font-bold text-gray-950">₹{totalAmount.toFixed(2)}</span> in cash to the delivery agent. No online payment is needed right now.
+                </p>
+              ) : (
+                <p>
+                  <span className="font-bold">Secure Online Payment:</span> You will be redirected to pay <span className="font-bold text-gray-950">₹{totalAmount.toFixed(2)}</span> securely via Razorpay (UPI, Card, Netbanking).
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Order Summary */}
-          <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary ({items.length} items)</h3>
+          <div className="bg-gray-50/60 p-6 rounded-xl border border-gray-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">Order Summary ({items.length} items)</h3>
             <div className="space-y-2 text-sm mb-4 max-h-40 overflow-y-auto pr-2">
-              <div className="flex font-semibold text-gray-600 border-b pb-1">
+              <div className="flex font-semibold text-gray-500 border-b pb-1 text-xs uppercase tracking-wider">
                 <span className="w-1/2">Product</span>
                 <span className="w-1/4 text-center">Qty</span>
                 <span className="w-1/4 text-right">Total</span>
               </div>
               {items.map((item, index) => (
-                <div key={index} className="flex justify-between text-gray-700">
-                  <span className="w-1/2 truncate pr-2">
+                <div key={index} className="flex justify-between text-gray-700 py-1">
+                  <span className="w-1/2 truncate pr-2 text-gray-900 font-medium">
                     {item.productName} 
                   </span>
-                  <span className="w-1/4 text-center">x{item.quantity}</span>
-                  <span className="w-1/4 text-right font-medium">
+                  <span className="w-1/4 text-center text-gray-600">x{item.quantity}</span>
+                  <span className="w-1/4 text-right font-semibold text-gray-900">
                     ₹{(item.price_at_add * item.quantity).toFixed(2)}
                   </span>
                 </div>
@@ -568,25 +776,25 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
             
             <Separator className="my-3" />
 
-            <div className="space-y-2 text-gray-700">
+            <div className="space-y-2 text-sm text-gray-600">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>₹{subtotal.toFixed(2)}</span>
+                <span className="font-medium text-gray-900">₹{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Shipping Fee</span>
-                <span>{shippingFee === 0 ? "Free" : `₹${shippingFee.toFixed(2)}`}</span>
+                <span className="font-medium text-gray-900">{shippingFee === 0 ? "Free" : `₹${shippingFee.toFixed(2)}`}</span>
               </div>
-              <div className="flex justify-between font-bold text-xl text-gray-900 pt-2 border-t border-gray-200">
+              <div className="flex justify-between font-bold text-lg text-gray-950 pt-2.5 border-t border-gray-200">
                 <span>Total Payable</span>
-                <span>₹{totalAmount.toFixed(2)}</span>
+                <span className="text-xl font-black text-purple-700">₹{totalAmount.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          <Button type="submit" className="w-full h-11 bg-green-600 hover:bg-green-700" disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {loading ? "Processing..." : `Proceed to Payment (₹${totalAmount.toFixed(2)})`}
+          <Button type="submit" className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2" disabled={loading}>
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+            {loading ? "Placing Order..." : paymentMethod === "cod" ? "Confirm Order (Cash on Delivery)" : "Pay and Confirm Order"}
           </Button>
         </form>
       </DialogContent>

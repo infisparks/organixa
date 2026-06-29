@@ -14,6 +14,8 @@ import {
     Truck, RefreshCw, ShoppingCart, Info
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { useToast } from "@/hooks/use-toast"
 
 // =========================================================================
 //                             TYPE DEFINITIONS
@@ -53,6 +55,8 @@ interface Order {
     house_number: string | null
     order_items: OrderItem[]
     resolved_order_items?: OrderItemWithProduct[]
+    payment_method?: string | null
+    payment_status?: string | null
 }
 
 // =========================================================================
@@ -89,10 +93,126 @@ const getStatusBadgeClass = (status: string) => {
 export default function OrderDetailsPage() {
     const params = useParams()
     const router = useRouter()
+    const { toast } = useToast()
     
     const [order, setOrder] = useState<Order | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [downloadLoading, setDownloadLoading] = useState(false)
+    const [cancelling, setCancelling] = useState(false)
+
+    const handleCancelOrder = async () => {
+        if (!order) return;
+        if (!confirm("Are you sure you want to cancel this order?")) return;
+
+        setCancelling(true);
+        try {
+            const { error: cancelError } = await supabase
+                .from("orders")
+                .update({ status: "cancelled" })
+                .eq("id", order.id);
+
+            if (cancelError) throw cancelError;
+
+            setOrder(prev => prev ? { ...prev, status: "cancelled" } : null);
+            toast({
+                title: "Order Cancelled",
+                description: "Your order has been cancelled successfully.",
+            });
+        } catch (err: any) {
+            console.error("Cancellation error:", err);
+            toast({
+                title: "Error",
+                description: err.message || "Failed to cancel order.",
+                variant: "destructive",
+            });
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const handleDownloadPDF = async () => {
+        if (!order) return;
+        const invoiceElement = document.getElementById("invoice-container");
+        if (!invoiceElement) return;
+
+        setDownloadLoading(true);
+        try {
+            const html2canvas = (await import("html2canvas")).default;
+            const jsPDF = (await import("jspdf")).default;
+
+            const originalGetComputedStyle = window.getComputedStyle;
+            
+            const resolveColorToStandard = (colorStr: string): string => {
+                if (!colorStr) return colorStr;
+                if (!colorStr.includes("oklch") && !colorStr.includes("lab")) return colorStr;
+                try {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 1;
+                    canvas.height = 1;
+                    const ctx = canvas.getContext("2d");
+                    if (ctx) {
+                        ctx.fillStyle = colorStr;
+                        return ctx.fillStyle; 
+                    }
+                } catch (e) {
+                    console.error("Color conversion failed:", e);
+                }
+                return "rgb(255, 255, 255)"; 
+            };
+
+            window.getComputedStyle = (elt, pseudoElt) => {
+                const style = originalGetComputedStyle(elt, pseudoElt);
+                return new Proxy(style, {
+                    get(target, prop) {
+                        const val = target[prop as keyof CSSStyleDeclaration];
+                        if (typeof val === "string" && (val.includes("oklch") || val.includes("lab"))) {
+                            return resolveColorToStandard(val);
+                        }
+                        return typeof val === "function" ? val.bind(target) : val;
+                    }
+                }) as unknown as CSSStyleDeclaration;
+            };
+
+            let canvas;
+            try {
+                canvas = await html2canvas(invoiceElement, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: "#ffffff",
+                    windowWidth: invoiceElement.scrollWidth,
+                    windowHeight: invoiceElement.scrollHeight
+                });
+            } finally {
+                window.getComputedStyle = originalGetComputedStyle;
+            }
+
+            const imgData = canvas.toDataURL("image/png");
+            const pdf = new jsPDF("p", "mm", "a4");
+            const imgWidth = 210;
+            const pageHeight = 297;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            pdf.save(`invoice_${order.id.substring(0, 12)}.pdf`);
+        } catch (err) {
+            console.error("Error generating PDF:", err);
+        } finally {
+            setDownloadLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchOrderDetails = async () => {
@@ -189,22 +309,52 @@ export default function OrderDetailsPage() {
                     <Button variant="ghost" asChild className="h-9 px-3 -ml-3 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg text-xs font-medium">
                         <Link href="/orders"><ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Orders</Link>
                     </Button>
-                    <Button onClick={handlePrint} className="h-9 px-5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium shadow-sm w-full sm:w-auto">
-                        <Printer className="w-4 h-4 mr-2" /> Print Invoice
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        {(order.status === "confirmed" || order.status === "processing" || order.status === "pending") && (
+                            <Button 
+                                onClick={handleCancelOrder}
+                                disabled={cancelling}
+                                variant="destructive"
+                                className="h-9 px-5 rounded-lg text-xs font-semibold shadow-sm w-full sm:w-auto flex items-center justify-center gap-2"
+                            >
+                                {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                Cancel Order
+                            </Button>
+                        )}
+                        <Button 
+                            onClick={handleDownloadPDF} 
+                            disabled={downloadLoading}
+                            className="h-9 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-medium shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto"
+                        >
+                            {downloadLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            )}
+                            {downloadLoading ? "Generating PDF..." : "Download Invoice"}
+                        </Button>
+                        <Button onClick={handlePrint} variant="outline" className="h-9 px-5 border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-medium shadow-sm w-full sm:w-auto flex items-center justify-center gap-2">
+                            <Printer className="w-4 h-4" /> Print Invoice
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Printable Invoice Container */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 print:shadow-none print:border-none print:rounded-none overflow-hidden">
+                <div id="invoice-container" className="bg-white rounded-2xl shadow-sm border border-slate-200 print:shadow-none print:border-none print:rounded-none overflow-hidden">
                     
                     {/* Invoice Header */}
                     <div className="p-6 sm:p-8 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start gap-4 bg-slate-50/50 print:bg-transparent print:border-b-2 print:border-slate-800">
                         <div>
                             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Order Invoice</h1>
-                            <div className="flex items-center gap-3 mt-1.5">
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                 <span className="text-sm font-mono font-semibold text-slate-600 uppercase">#{order.id.substring(0, 12)}</span>
-                                <Badge className={`px-1.5 py-0 text-[10px] font-bold uppercase tracking-widest rounded ${getStatusBadgeClass(order.status)} print:border-slate-300 print:text-slate-800`}>
+                                <Badge className={`px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${getStatusBadgeClass(order.status)} print:border-slate-300 print:text-slate-800`}>
                                     {order.status}
+                                </Badge>
+                                <Badge className={`px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded ${
+                                    order.payment_method === 'cod' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                                } print:border-slate-300 print:text-slate-800`}>
+                                    {order.payment_method === 'cod' ? 'COD' : 'ONLINE'}
                                 </Badge>
                             </div>
                         </div>
@@ -289,12 +439,34 @@ export default function OrderDetailsPage() {
                                         <span className="font-medium text-slate-900">{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
                                     </div>
                                     <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
-                                        <span className="font-bold text-slate-900">Grand Total</span>
-                                        <span className="text-lg font-black text-slate-900 tracking-tight">₹{grandTotal.toFixed(2)}</span>
+                                        <span className="font-bold text-slate-900 text-base">Grand Total</span>
+                                        <span className="text-lg font-black text-purple-700 tracking-tight">₹{grandTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
-                                <div className="mt-4 text-[10px] uppercase tracking-widest text-emerald-600 font-bold flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3" /> Paid Successfully
+                                <Separator className="my-3" />
+                                <div className="space-y-1.5 text-xs text-slate-600">
+                                    <div className="flex justify-between">
+                                        <span>Payment Method:</span>
+                                        <span className="font-semibold text-slate-800">
+                                            {order.payment_method === 'cod' ? 'Cash on Delivery (COD)' : order.payment_method === 'razorpay' ? 'Online Payment (Razorpay)' : 'Online Payment'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span>Payment Status:</span>
+                                        {order.payment_method === 'cod' ? (
+                                            order.status === 'delivered' || order.payment_status === 'paid' ? (
+                                                <span className="text-[9px] uppercase tracking-wider bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">Paid (Collected)</span>
+                                            ) : (
+                                                <span className="text-[9px] uppercase tracking-wider bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold">Pay on Delivery</span>
+                                            )
+                                        ) : (
+                                            order.payment_status === 'paid' ? (
+                                                <span className="text-[9px] uppercase tracking-wider bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">Paid Successfully</span>
+                                            ) : (
+                                                <span className="text-[9px] uppercase tracking-wider bg-red-50 text-red-700 px-1.5 py-0.5 rounded font-bold">Pending Payment</span>
+                                            )
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

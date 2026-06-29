@@ -399,8 +399,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   }
 
-  const handleOrderSuccess = () => {
-    router.push("/orders")
+  const handleOrderSuccess = (orderId: string) => {
+    router.push(`/orders/${orderId}`)
   }
 
   useEffect(() => {
@@ -590,7 +590,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             {/* Add to Cart Section */}
             <div className="mt-8 border-t border-gray-200 pt-8">
 
-              {/* Delivery Check Status */}
               <div className="mb-4 min-h-[1.5rem]">
                 {currentUserId && isCheckingDelivery && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 animate-pulse">

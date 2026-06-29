@@ -163,11 +163,36 @@ function OrderCard({ order }: { order: Order }) {
                             {/* Actions Header */}
                             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
                                 <span className="text-xs font-semibold text-slate-800 tracking-wide uppercase">Order Status</span>
-                                <Button asChild variant="outline" size="sm" className="h-7 px-3 text-[10px] font-semibold rounded-md border-slate-200">
-                                    <Link href={`/orders/${order.id}`} className="flex items-center gap-1.5">
-                                        Full Details <ExternalLink className="w-3 h-3" />
-                                    </Link>
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    {(order.status === "confirmed" || order.status === "processing" || order.status === "pending") && (
+                                        <Button 
+                                            variant="destructive" 
+                                            size="sm" 
+                                            className="h-7 px-3 text-[10px] font-semibold rounded-md"
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (confirm("Are you sure you want to cancel this order?")) {
+                                                    try {
+                                                        const { error } = await supabase
+                                                            .from("orders")
+                                                            .update({ status: "cancelled" })
+                                                            .eq("id", order.id);
+                                                        if (error) throw error;
+                                                    } catch (err: any) {
+                                                        alert(err.message || "Failed to cancel order.");
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            Cancel Order
+                                        </Button>
+                                    )}
+                                    <Button asChild variant="outline" size="sm" className="h-7 px-3 text-[10px] font-semibold rounded-md border-slate-200">
+                                        <Link href={`/orders/${order.id}`} className="flex items-center gap-1.5">
+                                            Full Details <ExternalLink className="w-3 h-3" />
+                                        </Link>
+                                    </Button>
+                                </div>
                             </div>
 
                             {/* Minimal Timeline */}

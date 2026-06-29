@@ -265,7 +265,7 @@ export default function CartPage() {
     setShowCheckoutModal(true)
   }
 
-  const handleOrderSuccess = async () => {
+  const handleOrderSuccess = async (orderId: string) => {
     // Clear the cart after successful order
     const {
       data: { session },
@@ -276,7 +276,7 @@ export default function CartPage() {
       if (!error) setCartItems([])
     }
     setShowCheckoutModal(false);
-    router.push("/orders")
+    router.push(`/orders/${orderId}`)
   }
 
   if (loading) {

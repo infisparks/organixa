@@ -54,6 +54,8 @@ interface Order {
     house_number: string | null
     order_items: OrderItem[]
     resolved_order_items?: OrderItemWithProduct[]
+    payment_method?: string | null
+    payment_status?: string | null
 }
 
 // =========================================================================
@@ -143,8 +145,268 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({ isOpen, onClose, 
 };
 
 // =========================================================================
-//                             MAIN COMPONENT
+//                             SHIPPING LABEL / DELIVERY INVOICE COMPONENT
 // =========================================================================
+
+interface ShippingLabelModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    order: Order;
+    company: {
+        company_name: string;
+        company_address: string;
+        mobile_number: string;
+        email: string;
+        gst_number: string;
+    } | null;
+}
+
+const BarcodeSVG = ({ value }: { value: string }) => {
+    const chars = value.split("");
+    return (
+        <svg viewBox="0 0 100 20" className="w-full h-8" preserveAspectRatio="none">
+            {chars.map((char, index) => {
+                const width = (char.charCodeAt(0) % 3) + 1;
+                const gap = (char.charCodeAt(0) % 2) + 1;
+                return (
+                    <rect
+                        key={index}
+                        x={index * 6}
+                        y="0"
+                        width={width}
+                        height="20"
+                        fill="black"
+                    />
+                );
+            })}
+        </svg>
+    );
+};
+
+const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({ isOpen, onClose, order, company }) => {
+    const [downloading, setDownloading] = useState(false);
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleDownloadPDF = async () => {
+        const labelElt = document.getElementById("shipping-label-print-area");
+        if (!labelElt) return;
+        setDownloading(true);
+        try {
+            const html2canvas = (await import("html2canvas")).default;
+            const jsPDF = (await import("jspdf")).default;
+
+            const originalGetComputedStyle = window.getComputedStyle;
+            const resolveColorToStandard = (colorStr: string): string => {
+                if (!colorStr) return colorStr;
+                if (!colorStr.includes("oklch") && !colorStr.includes("lab")) return colorStr;
+                try {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 1;
+                    canvas.height = 1;
+                    const ctx = canvas.getContext("2d");
+                    if (ctx) {
+                        ctx.fillStyle = colorStr;
+                        return ctx.fillStyle;
+                    }
+                } catch (e) {
+                    console.error("Color conversion failed:", e);
+                }
+                return "rgb(255, 255, 255)";
+            };
+
+            window.getComputedStyle = (elt, pseudoElt) => {
+                const style = originalGetComputedStyle(elt, pseudoElt);
+                return new Proxy(style, {
+                    get(target, prop) {
+                        const val = target[prop as keyof CSSStyleDeclaration];
+                        if (typeof val === "string" && (val.includes("oklch") || val.includes("lab"))) {
+                            return resolveColorToStandard(val);
+                        }
+                        return typeof val === "function" ? val.bind(target) : val;
+                    }
+                }) as unknown as CSSStyleDeclaration;
+            };
+
+            let canvas;
+            try {
+                canvas = await html2canvas(labelElt, {
+                    scale: 3,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: "#ffffff",
+                    windowWidth: labelElt.scrollWidth,
+                    windowHeight: labelElt.scrollHeight
+                });
+            } finally {
+                window.getComputedStyle = originalGetComputedStyle;
+            }
+
+            const imgData = canvas.toDataURL("image/png");
+            const pdf = new jsPDF("p", "mm", [105, 148]);
+            pdf.addImage(imgData, "PNG", 2, 2, 101, 144);
+            pdf.save(`shipping_label_${order.id.substring(0, 8)}.pdf`);
+        } catch (err) {
+            console.error("Error downloading shipping label:", err);
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-lg w-[95vw] rounded-xl p-6 max-h-[90vh] overflow-y-auto font-sans">
+                <DialogHeader className="mb-4">
+                    <DialogTitle className="text-lg font-bold text-slate-900">Print Shipping Label / Invoice</DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500">
+                        Print this box-label to stick on the product package.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <style dangerouslySetInnerHTML={{ __html: `
+                    @media print {
+                        body * {
+                            visibility: hidden !important;
+                        }
+                        #shipping-label-print-area, #shipping-label-print-area * {
+                            visibility: visible !important;
+                        }
+                        #shipping-label-print-area {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 105mm !important;
+                            height: 148mm !important;
+                            border: none !important;
+                            margin: 0 !important;
+                            padding: 10px !important;
+                            background: white !important;
+                        }
+                    }
+                ` }} />
+
+                <div className="flex justify-center p-4 bg-slate-100/50 border rounded-xl mb-4 overflow-x-auto">
+                    <div 
+                        id="shipping-label-print-area"
+                        className="bg-white border-2 border-black w-[100mm] min-h-[140mm] p-4 flex flex-col justify-between font-mono text-[9px] leading-tight text-black"
+                    >
+                        <div id="shipping-label-box" className="flex flex-col h-full justify-between gap-3">
+                            
+                            <div className="border-b border-black pb-2 text-center">
+                                <h2 className="text-[11px] font-bold tracking-tight">DELIVERY CHALLAN / SHIPPING LABEL</h2>
+                                <p className="text-[6px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">Indian Standard E-Commerce Format</p>
+                            </div>
+
+                            <div className="border-b border-black py-2 grid grid-cols-4 gap-2 items-center">
+                                <div className="col-span-2 flex flex-col gap-1 pr-1">
+                                    <BarcodeSVG value={order.id} />
+                                    <span className="text-[6px] text-center tracking-wider font-bold">{order.id.toUpperCase()}</span>
+                                </div>
+                                <div className="border-l border-black pl-2 flex flex-col items-center justify-center">
+                                    <img 
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(order.id)}`} 
+                                        alt="QR" 
+                                        className="w-10 h-10 object-contain"
+                                    />
+                                    <span className="text-[5px] text-slate-500 font-bold uppercase mt-0.5">SCAN QR</span>
+                                </div>
+                                <div className="border-l border-black pl-2 flex flex-col items-center justify-center">
+                                    <span className="text-[6px] font-bold text-slate-500 uppercase">PINCODE</span>
+                                    <span className="text-xs font-black tracking-tight mt-0.5">{order.pincode}</span>
+                                </div>
+                            </div>
+
+                            <div className="border-b border-black py-2 grid grid-cols-2 gap-2 divide-x divide-black text-[8px]">
+                                <div className="pr-1">
+                                    <p className="font-bold border-b border-black pb-0.5 mb-1 uppercase tracking-wider text-[7px]">From (Sender)</p>
+                                    <p className="font-bold text-slate-900">{company?.company_name || "Merchant Store"}</p>
+                                    <p className="text-slate-600 leading-normal mt-0.5">{company?.company_address || "Registered Vendor Office"}</p>
+                                    {company?.gst_number && <p className="font-bold mt-1 text-[7px]">GSTIN: {company.gst_number}</p>}
+                                    {company?.mobile_number && <p className="text-[7px] mt-0.5">Mob: {company.mobile_number}</p>}
+                                </div>
+                                <div className="pl-2">
+                                    <p className="font-bold border-b border-black pb-0.5 mb-1 uppercase tracking-wider text-[7px]">To (Recipient)</p>
+                                    <p className="font-bold text-slate-900">{order.customer_name}</p>
+                                    <p className="text-slate-600 leading-normal mt-0.5">{order.house_number}, {order.street}</p>
+                                    <p>{order.area}</p>
+                                    <p className="font-bold text-slate-900">{order.city}, {order.state} - {order.pincode}</p>
+                                    <p className="font-bold mt-1 text-[7px]">Mob: {order.primary_phone}</p>
+                                </div>
+                            </div>
+
+                            <div className="border-b border-black py-2 text-center bg-slate-50/50">
+                                {order.payment_method === "cod" ? (
+                                    <div className="border border-black p-2 bg-slate-100 rounded">
+                                        <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">CASH ON DELIVERY</p>
+                                        <p className="text-base font-black text-black tracking-tight mt-0.5">COLLECT CASH: ₹{order.total_amount.toFixed(2)}</p>
+                                    </div>
+                                ) : (
+                                    <div className="border border-black p-2 bg-slate-100 rounded">
+                                        <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">ONLINE PREPAID</p>
+                                        <p className="text-base font-black text-emerald-800 tracking-tight mt-0.5">PREPAID - DO NOT COLLECT CASH</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="border-b border-black py-2 text-[7px] leading-normal flex-grow">
+                                <p className="font-bold border-b border-black pb-0.5 mb-1 uppercase tracking-wider text-[7px]">Package Contents ({order.resolved_order_items?.length || 0} Items)</p>
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-slate-200">
+                                            <th className="font-bold pb-0.5">Item Description</th>
+                                            <th className="font-bold pb-0.5 text-center">Qty</th>
+                                            <th className="font-bold pb-0.5 text-right">Price</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {order.resolved_order_items?.map((item, idx) => (
+                                            <tr key={idx} className="border-b border-slate-100">
+                                                <td className="py-1 truncate max-w-[120px]">{item.products?.product_name}</td>
+                                                <td className="py-1 text-center font-bold">{item.quantity}</td>
+                                                <td className="py-1 text-right">₹{item.unit_price}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="pt-2 text-[6px] text-slate-500 text-center leading-normal">
+                                <p className="font-semibold text-[7px] text-slate-700">Order ID: {order.id.substring(0, 18).toUpperCase()}</p>
+                                <p className="mt-0.5">Declaration: The goods sold are intended for end-consumption. This is a computer generated document, no signature is required.</p>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                    <Button 
+                        onClick={handleDownloadPDF} 
+                        disabled={downloading}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                        {downloading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                        )}
+                        {downloading ? "Downloading..." : "Download Label"}
+                    </Button>
+                    <Button 
+                        onClick={handlePrint} 
+                        variant="outline" 
+                        className="flex-1 border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg h-10 font-semibold text-xs flex items-center justify-center gap-1.5"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                        Print Label
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 export default function CompanyMyOrdersPage() {
     const [orders, setOrders] = useState<Order[]>([])
@@ -154,6 +416,9 @@ export default function CompanyMyOrdersPage() {
     const [isUpdating, setIsUpdating] = useState(false)
     const [modalOpen, setModalOpen] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+    const [company, setCompany] = useState<any>(null)
+    const [labelOpen, setLabelOpen] = useState(false)
+    const [selectedOrderForLabel, setSelectedOrderForLabel] = useState<Order | null>(null)
     const router = useRouter()
     const { toast } = useToast()
 
@@ -170,7 +435,7 @@ export default function CompanyMyOrdersPage() {
         const userId = session.user.id
         const { data: companyData, error: companyError } = await supabase
             .from("companies")
-            .select("id")
+            .select("id, company_name, company_address, mobile_number, email, gst_number")
             .eq("user_id", userId)
             .maybeSingle()
 
@@ -179,6 +444,8 @@ export default function CompanyMyOrdersPage() {
             setLoading(false)
             return
         }
+
+        setCompany(companyData)
 
         const companyId = companyData.id
         const { data: ordersWithItems, error: fetchError } = await supabase
@@ -372,15 +639,26 @@ export default function CompanyMyOrdersPage() {
                                         </span>
                                     </div>
 
-                                    {order.status !== 'delivered' && order.status !== 'cancelled' && (
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
                                         <Button 
-                                            variant="default" 
-                                            onClick={() => { setSelectedOrder(order); setModalOpen(true); }}
-                                            className="h-9 px-4 text-xs font-medium bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-sm w-full sm:w-auto"
+                                            variant="outline" 
+                                            onClick={() => { setSelectedOrderForLabel(order); setLabelOpen(true); }}
+                                            className="h-9 px-3 text-xs font-medium text-slate-700 border-slate-200 hover:bg-slate-50 rounded-lg flex items-center gap-1.5"
                                         >
-                                            <RefreshCw className="w-3.5 h-3.5 mr-2" /> Update Status
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-printer"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                                            Delivery Challan
                                         </Button>
-                                    )}
+
+                                        {order.status !== "delivered" && order.status !== "cancelled" && (
+                                            <Button 
+                                                variant="default" 
+                                                onClick={() => { setSelectedOrder(order); setModalOpen(true); }}
+                                                className="h-9 px-4 text-xs font-medium bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-sm"
+                                            >
+                                                <RefreshCw className="w-3.5 h-3.5 mr-2" /> Update Status
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <CardContent className="p-0">
@@ -485,6 +763,15 @@ export default function CompanyMyOrdersPage() {
                     currentOrder={selectedOrder}
                     onUpdate={handleStatusUpdate}
                     isLoading={isUpdating}
+                />
+            )}
+
+            {selectedOrderForLabel && (
+                <ShippingLabelModal
+                    isOpen={labelOpen}
+                    onClose={() => setLabelOpen(false)}
+                    order={selectedOrderForLabel}
+                    company={company}
                 />
             )}
         </div>
