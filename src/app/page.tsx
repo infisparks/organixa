@@ -14,18 +14,26 @@ import { motion } from "framer-motion"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 
+import ProductCard, { type Product } from "@/components/ProductCard"
+
 // =========================================================================
 //                             HELPER FUNCTIONS
 // =========================================================================
 
 function ProductSkeleton() {
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100 animate-pulse flex flex-col">
-      <div className="aspect-square bg-slate-100" />
-      <div className="p-2.5 sm:p-3 flex flex-col gap-2">
-        <div className="h-3 bg-slate-200 rounded w-full" />
-        <div className="h-3 bg-slate-200 rounded w-2/3" />
-        <div className="h-4 bg-slate-200 rounded w-1/3 mt-1" />
+    <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 animate-pulse flex flex-col h-full">
+      <div className="aspect-square bg-slate-100 rounded-[16px]" />
+      <div className="p-3 flex flex-col gap-2 flex-grow justify-between">
+        <div className="flex flex-col gap-1.5">
+          <div className="h-3.5 bg-slate-200 rounded w-full" />
+          <div className="h-3.5 bg-slate-200 rounded w-2/3" />
+          <div className="h-2.5 bg-slate-100 rounded w-1/2 mt-1" />
+        </div>
+        <div className="mt-3 flex flex-col gap-3">
+          <div className="h-4 bg-slate-200 rounded w-1/3" />
+          <div className="h-9 bg-slate-100 rounded-full w-full" />
+        </div>
       </div>
     </div>
   )
@@ -34,23 +42,6 @@ function ProductSkeleton() {
 // =========================================================================
 //                             TYPE DEFINITIONS
 // =========================================================================
-
-type Product = {
-  id: string
-  product_name: string
-  product_photo_urls?: string[]
-  original_price?: number
-  discount_price: number
-  categories?: Array<{ main: string; sub: string }>
-  company: {
-    company_name: string
-    company_logo_url: string
-  } | null
-  is_featured?: boolean
-  is_best_seller?: boolean
-  is_approved?: boolean
-  stock_quantity?: number
-}
 
 type CategoryProps = {
   categories: { id: number; title: string; subtitle: string; icon: string; image: string }[]
@@ -101,150 +92,6 @@ function CategoryCarousel({ categories, selectedCategory, onCategoryClick }: Cat
         </div>
       </div>
     </section>
-  )
-}
-
-function FavButton({ product }: { product: Product }) {
-  const [isFav, setIsFav] = useState(false)
-  const [showAuthPopup, setShowAuthPopup] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [isAnimating, setIsAnimating] = useState(false)
-
-  useEffect(() => {
-    const checkUserAndFavStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUserId = session?.user?.id || null
-      setUserId(currentUserId)
-
-      if (currentUserId) {
-        const { data } = await supabase
-          .from("favorites")
-          .select("id")
-          .eq("user_id", currentUserId)
-          .eq("product_id", product.id)
-          .maybeSingle()
-        setIsFav(!!data)
-      } else {
-        setIsFav(false)
-      }
-      setIsLoading(false)
-    }
-
-    checkUserAndFavStatus()
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => checkUserAndFavStatus())
-    return () => authListener.subscription.unsubscribe()
-  }, [product.id])
-
-  const toggleFav = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    e.preventDefault()
-
-    if (!userId) {
-      setShowAuthPopup(true)
-      return
-    }
-
-    setIsLoading(true)
-    setIsAnimating(true)
-    try {
-      if (isFav) {
-        await supabase.from("favorites").delete().eq("user_id", userId).eq("product_id", product.id)
-        setIsFav(false)
-      } else {
-        await supabase.from("favorites").insert({ user_id: userId, product_id: product.id })
-        setIsFav(true)
-      }
-    } catch (error) {
-      console.error("Error toggling favorite:", error)
-    } finally {
-      setIsLoading(false)
-      setTimeout(() => setIsAnimating(false), 600)
-    }
-  }
-
-  return (
-    <>
-      <button
-        onClick={toggleFav}
-        disabled={isLoading}
-        className={`p-1.5 sm:p-2 rounded-full backdrop-blur-md transition-all duration-300 z-20 
-          ${isLoading ? "opacity-50 cursor-not-allowed" : "opacity-100"}
-          ${isFav ? "bg-red-50 text-red-500 shadow-sm" : "bg-white/80 text-slate-400 hover:text-slate-600 shadow-sm"}
-        `}
-        aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-      >
-        <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 ${isFav ? "fill-current" : ""} ${isAnimating ? "scale-125" : ""}`} />
-      </button>
-      <AuthPopup isOpen={showAuthPopup} onClose={() => setShowAuthPopup(false)} onSuccess={() => setShowAuthPopup(false)} />
-    </>
-  )
-}
-
-// =========================================================================
-//                     UPDATED COMPACT PRODUCT CARD
-// =========================================================================
-
-function ProductCard({ product, index }: { product: Product, index: number }) {
-  const discountPercent = product.original_price
-    ? Math.round(((product.original_price - product.discount_price) / product.original_price) * 100)
-    : 0
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-20px" }}
-      transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3) }}
-      className="group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-slate-100 flex flex-col overflow-hidden font-poppins h-full"
-    >
-      {/* FavButton placed absolutely to sit above the link without blocking it entirely */}
-      <div className="absolute top-2 right-2 z-20">
-        <FavButton product={product} />
-      </div>
-
-      {/* The entire card is wrapped in the Link */}
-      <Link href={`/product/${product.id}`} className="flex flex-col h-full z-10">
-        {/* Image Section - Compact Square Ratio */}
-        <div className="relative aspect-square overflow-hidden bg-slate-50">
-          <Image
-            src={getPublicUrlFromPath(product.product_photo_urls?.[0])}
-            alt={product.product_name}
-            fill
-            unoptimized
-            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            priority={index < 4}
-          />
-          {/* Badge */}
-          {discountPercent > 0 && (
-            <div className="absolute top-2 left-2 z-20">
-              <span className="bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm tracking-wide">
-                -{discountPercent}%
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Minimal Content Section */}
-        <div className="p-2.5 sm:p-3 flex flex-col flex-grow justify-between bg-white">
-          <h3 className="font-medium text-slate-800 text-xs sm:text-sm leading-tight line-clamp-2 mb-1.5 group-hover:text-emerald-600 transition-colors">
-            {product.product_name}
-          </h3>
-
-          <div className="flex items-baseline gap-1.5 mt-auto">
-            <span className="text-sm font-semibold text-slate-900">
-              ₹{product.discount_price.toFixed(2)}
-            </span>
-            {product.original_price && product.original_price > product.discount_price && (
-              <span className="text-[10px] text-slate-400 line-through">
-                ₹{product.original_price.toFixed(2)}
-              </span>
-            )}
-          </div>
-        </div>
-      </Link>
-    </motion.div>
   )
 }
 
@@ -395,7 +242,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
             {isLoading
               ? Array(10).fill(0).map((_, i) => <ProductSkeleton key={i} />)
               : getFilteredProducts().length > 0

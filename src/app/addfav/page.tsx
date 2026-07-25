@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardTitle } from "@/components/ui/card"
 import { Loader2, HeartCrack, Trash2, ShoppingCart, Check, Tag } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import ProductCard from "@/components/ProductCard"
 
 // =========================================================================
 //                             COMPONENT DEFINITION

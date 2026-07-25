@@ -12,176 +12,26 @@ import { Label } from "@/components/ui/label"
 import Footer from "@/components/Footer"
 import Header from "@/components/Header"
 import { supabase } from "@/lib/supabase"
-import AuthPopup from "@/components/auth-popup"
-import { getPublicUrlFromPath } from "@/lib/image-utils"
+import ProductCard, { type Product } from "@/components/ProductCard"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-
-// =========================================================================
-//                             TYPE DEFINITIONS
-// =========================================================================
-
-type Product = {
-  id: string
-  product_name: string
-  product_photo_urls?: string[]
-  original_price?: number
-  discount_price: number
-  categories?: Array<{ main: string; sub: string }>
-  company: {
-    company_name: string
-    company_logo_url: string
-  } | null
-  is_featured?: boolean
-  is_best_seller?: boolean
-  is_approved?: boolean
-  stock_quantity?: number
-}
 
 // =========================================================================
 //                             COMPONENTS
 // =========================================================================
 
-function FavButton({ product }: { product: Product }) {
-  const [isFav, setIsFav] = useState(false)
-  const [showAuthPopup, setShowAuthPopup] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
-
-  useEffect(() => {
-    const checkUserAndFavStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUserId = session?.user?.id || null
-      setUserId(currentUserId)
-
-      if (currentUserId) {
-        const { data } = await supabase
-          .from("favorites")
-          .select("id")
-          .eq("user_id", currentUserId)
-          .eq("product_id", product.id)
-          .maybeSingle()
-        setIsFav(!!data)
-      } else {
-        setIsFav(false)
-      }
-      setIsLoading(false)
-    }
-
-    checkUserAndFavStatus()
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id || null)
-      checkUserAndFavStatus()
-    })
-    return () => authListener.subscription.unsubscribe()
-  }, [product.id])
-
-  const toggleFav = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    e.preventDefault()
-    if (!userId) {
-      setShowAuthPopup(true)
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      if (isFav) {
-        await supabase.from("favorites").delete().eq("user_id", userId).eq("product_id", product.id)
-        setIsFav(false)
-      } else {
-        await supabase.from("favorites").insert({ user_id: userId, product_id: product.id })
-        setIsFav(true)
-      }
-    } catch (error) {
-      console.error("Error toggling favorite:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <>
-      <button
-        onClick={toggleFav}
-        disabled={isLoading}
-        className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full backdrop-blur-md transition-all duration-300 z-20 
-          ${isLoading ? "opacity-50" : "opacity-100"} 
-          ${isFav ? "bg-red-50 text-red-500 shadow-sm" : "bg-white/80 text-slate-400 hover:text-slate-900 shadow-sm"}`}
-        aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-      >
-        <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${isFav ? "fill-current scale-110" : "scale-100"}`} />
-      </button>
-      <AuthPopup isOpen={showAuthPopup} onClose={() => setShowAuthPopup(false)} onSuccess={() => setShowAuthPopup(false)} />
-    </>
-  )
-}
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.25, 0, 1] } }
-}
-
-function ProductCard({ product }: { product: Product }) {
-  const discountPercent = product.original_price && product.original_price > product.discount_price
-    ? Math.round(((product.original_price - product.discount_price) / product.original_price) * 100)
-    : 0
-
-  return (
-    <motion.div variants={itemVariants} className="h-full">
-      <Link 
-        href={`/product/${product.id}`} 
-        className="group relative flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-slate-100 hover:border-slate-200 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300"
-      >
-        {/* Minimal Image Container */}
-        <div className="relative aspect-square overflow-hidden bg-slate-50">
-          <img
-            src={getPublicUrlFromPath(product.product_photo_urls?.[0]) || "/placeholder.svg"}
-            alt={product.product_name}
-            className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-105"
-          />
-          
-          {/* Discount Badge */}
-          {discountPercent > 0 && (
-            <div className="absolute top-2 left-2 z-10">
-              <span className="bg-slate-900/90 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded shadow-sm tracking-wide">
-                -{discountPercent}%
-              </span>
-            </div>
-          )}
-          <FavButton product={product} />
-        </div>
-
-        {/* Clean Content Area */}
-        <div className="p-3 flex flex-col flex-grow justify-between">
-          <h3 className="font-medium text-slate-800 text-xs sm:text-sm leading-tight line-clamp-2 mb-2 group-hover:text-emerald-600 transition-colors">
-            {product.product_name}
-          </h3>
-
-          <div className="flex items-baseline gap-1.5 mt-auto">
-            <span className="text-sm sm:text-base font-semibold text-slate-900 tracking-tight">
-              ₹{product.discount_price.toFixed(2)}
-            </span>
-            {discountPercent > 0 && (
-              <span className="text-[10px] sm:text-xs text-slate-400 line-through">
-                ₹{product.original_price?.toFixed(2)}
-              </span>
-            )}
-          </div>
-        </div>
-      </Link>
-    </motion.div>
-  )
-}
-
 function ProductSkeleton() {
   return (
-    <div className="bg-white rounded-2xl h-full overflow-hidden border border-slate-100 flex flex-col">
-      <Skeleton className="aspect-square w-full rounded-none bg-slate-100" />
-      <div className="p-3 flex flex-col gap-2 flex-grow">
-        <Skeleton className="h-3.5 w-full bg-slate-100" />
-        <Skeleton className="h-3.5 w-2/3 bg-slate-100" />
-        <div className="mt-auto pt-2">
-          <Skeleton className="h-4 w-1/3 bg-slate-100" />
+    <div className="bg-white rounded-2xl h-full overflow-hidden border border-slate-100 flex flex-col p-0 animate-pulse">
+      <Skeleton className="aspect-square w-full rounded-[16px] bg-slate-100" />
+      <div className="p-3 flex flex-col gap-2 flex-grow justify-between">
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-3.5 w-full bg-slate-200" />
+          <Skeleton className="h-3.5 w-2/3 bg-slate-200" />
+          <Skeleton className="h-2.5 w-1/2 bg-slate-100 mt-1" />
+        </div>
+        <div className="mt-auto pt-2 flex flex-col gap-2.5">
+          <Skeleton className="h-4 w-1/3 bg-slate-200" />
+          <Skeleton className="h-9 w-full rounded-full bg-slate-100" />
         </div>
       </div>
     </div>
@@ -340,15 +190,15 @@ export default function ShopPage() {
 
             {/* Premium Dense Grid */}
             {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                {Array(15).fill(0).map((_, i) => <ProductSkeleton key={i} />)}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {Array(12).fill(0).map((_, i) => <ProductSkeleton key={i} />)}
               </div>
             ) : filteredProducts.length > 0 ? (
               <motion.div
                 variants={containerVariants}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4"
+                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
               >
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
