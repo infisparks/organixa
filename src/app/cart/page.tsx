@@ -459,6 +459,9 @@ export default function CartPage() {
                       Add ₹{(1000 - subtotal).toFixed(2)} more for free shipping!
                     </p>
                   )}
+                  <p className="text-xs text-amber-800 bg-amber-50 p-2 rounded-lg text-center font-medium border border-amber-200/80">
+                    💡 Cash on Delivery (COD) orders incur an extra ₹100 handling fee at checkout.
+                  </p>
                   <Separator className="bg-green-100" />
                   <div className="flex justify-between font-extrabold text-xl text-gray-900">
                     <span>Order Total</span>

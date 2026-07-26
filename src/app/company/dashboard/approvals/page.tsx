@@ -141,30 +141,33 @@ export default function ApprovalsPage() {
   if (loading || isAdmin === null) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center">
-        <Loader2 className="h-10 w-10 animate-spin text-green-600" />
-        <p className="mt-4 text-gray-600 font-medium">Checking authorization...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <p className="mt-3 text-slate-600 font-medium text-xs">Checking authorization...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto px-4 py-6">
+    <div className="space-y-6 md:space-y-8 max-w-6xl mx-auto px-4 py-6 font-sans">
       {/* Header section - responsive layout */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center  flex-items-center justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl m-auto sm:m-0  font-bold text-gray-900">Admin Approvals</h1>
-        <Button variant="outline" onClick={fetchData} size="sm" className="w-full sm:w-auto">
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh Data
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">Admin Approvals</h1>
+          <p className="text-xs text-slate-500 mt-1">Manage vendor registrations and product catalog approvals.</p>
+        </div>
+        <Button variant="outline" onClick={fetchData} size="sm" className="w-full sm:w-auto text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl h-9">
+          <RefreshCw className="w-3.5 h-3.5 mr-2 text-slate-500" /> Refresh Data
         </Button>
       </div>
 
       <Tabs defaultValue="companies" className="w-full">
         {/* Scrollable tabs list for mobile */}
-        <TabsList className="grid w-full grid-cols-2 mb-6 bg-green-50 p-1">
-          <TabsTrigger value="companies" className="data-[state=active]:bg-green-600 data-[state=active]:text-white flex items-center justify-center gap-2 text-sm md:text-base py-2">
+        <TabsList className="grid w-full grid-cols-2 mb-6 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+          <TabsTrigger value="companies" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-xl flex items-center justify-center gap-2 text-xs md:text-sm py-2 font-semibold transition-all">
             <Building className="w-4 h-4" />
             <span>Companies</span> ({companies.length})
           </TabsTrigger>
-          <TabsTrigger value="products" className="data-[state=active]:bg-green-600 data-[state=active]:text-white flex items-center justify-center gap-2 text-sm md:text-base py-2">
+          <TabsTrigger value="products" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-xl flex items-center justify-center gap-2 text-xs md:text-sm py-2 font-semibold transition-all">
             <Package className="w-4 h-4" />
             <span>Products</span> ({products.length})
           </TabsTrigger>
@@ -172,42 +175,42 @@ export default function ApprovalsPage() {
 
         {/* --- COMPANIES TAB --- */}
         <TabsContent value="companies">
-          <Card className="border-green-100 shadow-lg overflow-hidden">
-            <CardHeader className="bg-green-50/50 py-4">
-              <CardTitle className="text-lg md:text-xl text-center lg:text-start">Company Registration Requests</CardTitle>
+          <Card className="border-slate-200 shadow-xs rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="bg-slate-50/70 border-b border-slate-100 py-4 px-6">
+              <CardTitle className="text-base font-semibold text-slate-900">Company Registration Requests</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 sm:p-6">
+            <CardContent className="p-0">
               {/* Desktop View Table */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="w-full divide-y divide-slate-100">
+                  <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Logo</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Logo</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Company Name</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-slate-100">
                     {companies.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-10 text-center text-gray-500 italic">No companies found</td>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-xs italic">No company requests found</td>
                       </tr>
                     ) : (
                       companies.map((company) => (
-                        <tr key={company.id} className="hover:bg-gray-50 transition-colors">
+                        <tr key={company.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             {company.company_logo_url ? (
-                              <img src={company.company_logo_url} className="w-10 h-10 rounded-full object-cover border" alt="" />
+                              <img src={company.company_logo_url} className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-xs" alt="" />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><Building className="w-5 h-5 text-gray-400" /></div>
+                              <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center"><Building className="w-4 h-4 text-slate-400" /></div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{company.company_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-gray-600">{company.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-xs text-slate-900">{company.company_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-600 font-medium">{company.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${company.is_approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${company.is_approved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                               {company.is_approved ? 'Approved' : 'Pending'}
                             </span>
                           </td>
@@ -215,12 +218,12 @@ export default function ApprovalsPage() {
                             <Button
                               size="sm"
                               variant={company.is_approved ? "destructive" : "default"}
-                              className={!company.is_approved ? "bg-green-600 hover:bg-green-700" : ""}
+                              className={`h-8 px-3 text-xs font-semibold rounded-xl ${!company.is_approved ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-none"}`}
                               disabled={actionLoading === company.id}
                               onClick={() => handleToggleApproval("company", company.id, company.is_approved)}
                             >
-                              {actionLoading === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                                (company.is_approved ? <><XCircle className="w-4 h-4 mr-2" /> Revoke</> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>)}
+                              {actionLoading === company.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                                (company.is_approved ? <><XCircle className="w-3.5 h-3.5 mr-1.5" /> Revoke</> : <><CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Approve</>)}
                             </Button>
                           </td>
                         </tr>
@@ -231,36 +234,36 @@ export default function ApprovalsPage() {
               </div>
 
               {/* Mobile View Cards */}
-              <div className="md:hidden divide-y divide-gray-200">
+              <div className="md:hidden divide-y divide-slate-100">
                 {companies.length === 0 ? (
-                  <div className="px-6 py-10 text-center text-gray-500 italic">No companies found</div>
+                  <div className="px-6 py-10 text-center text-slate-400 text-xs italic">No company requests found</div>
                 ) : (
                   companies.map((company) => (
-                    <div key={company.id} className="p-4 space-y-4">
-                      <div className="flex items-center gap-4">
+                    <div key={company.id} className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
                         {company.company_logo_url ? (
-                          <img src={company.company_logo_url} className="w-12 h-12 rounded-full object-cover border" alt="" />
+                          <img src={company.company_logo_url} className="w-10 h-10 rounded-xl object-cover border border-slate-200" alt="" />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center"><Building className="w-6 h-6 text-gray-400" /></div>
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center"><Building className="w-5 h-5 text-slate-400" /></div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-gray-900 truncate">{company.company_name}</p>
-                          <p className="text-sm text-gray-500 truncate">{company.email}</p>
+                          <p className="font-semibold text-xs text-slate-900 truncate">{company.company_name}</p>
+                          <p className="text-[11px] text-slate-500 truncate">{company.email}</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${company.is_approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${company.is_approved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                           {company.is_approved ? 'Approved' : 'Pending'}
                         </span>
                         <Button
                           size="sm"
                           variant={company.is_approved ? "destructive" : "default"}
-                          className={!company.is_approved ? "bg-green-600 hover:bg-green-700" : ""}
+                          className={`h-8 px-3 text-xs font-semibold rounded-xl ${!company.is_approved ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-none"}`}
                           disabled={actionLoading === company.id}
                           onClick={() => handleToggleApproval("company", company.id, company.is_approved)}
                         >
-                          {actionLoading === company.id ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                            (company.is_approved ? <><XCircle className="w-4 h-4 mr-2" /> Revoke</> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>)}
+                          {actionLoading === company.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                            (company.is_approved ? <><XCircle className="w-3.5 h-3.5 mr-1.5" /> Revoke</> : <><CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Approve</>)}
                         </Button>
                       </div>
                     </div>
@@ -273,33 +276,33 @@ export default function ApprovalsPage() {
 
         {/* --- PRODUCTS TAB --- */}
         <TabsContent value="products">
-          <Card className="border-green-100 shadow-lg overflow-hidden">
-            <CardHeader className="bg-green-50/50 py-4">
-              <CardTitle className="text-lg md:text-xl text-center lg:text-start">Product Catalog Approvals</CardTitle>
+          <Card className="border-slate-200 shadow-xs rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="bg-slate-50/70 border-b border-slate-100 py-4 px-6">
+              <CardTitle className="text-base font-semibold text-slate-900">Product Catalog Approvals</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 sm:p-6">
+            <CardContent className="p-0">
               {/* Desktop View Table */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="w-full divide-y divide-slate-100">
+                  <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Image</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Product</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Company</th>
+                      <th className="px-6 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-slate-100">
                     {products.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-10 text-center text-gray-500 italic">No products found</td>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-xs italic">No products found</td>
                       </tr>
                     ) : (
                       products.map((product) => (
-                        <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                        <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="w-12 h-12 relative rounded border overflow-hidden">
+                            <div className="w-10 h-10 relative rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
                               {product.product_photo_urls?.[0] ? (
                                 <Image
                                   src={supabase.storage.from("product-media").getPublicUrl(product.product_photo_urls[0]).data.publicUrl}
@@ -309,14 +312,14 @@ export default function ApprovalsPage() {
                                   unoptimized
                                 />
                               ) : (
-                                <div className="w-full h-full bg-gray-50 flex items-center justify-center"><Package className="w-5 h-5 text-gray-300" /></div>
+                                <div className="w-full h-full bg-slate-50 flex items-center justify-center"><Package className="w-4 h-4 text-slate-300" /></div>
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{product.product_name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm font-semibold">{product.company_name || "Unknown"}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-xs text-slate-900">{product.product_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-xs font-semibold">{product.company_name || "Unknown"}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${product.is_approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${product.is_approved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                               {product.is_approved ? 'Approved' : 'Pending'}
                             </span>
                           </td>
@@ -324,12 +327,12 @@ export default function ApprovalsPage() {
                             <Button
                               size="sm"
                               variant={product.is_approved ? "destructive" : "default"}
-                              className={!product.is_approved ? "bg-green-600 hover:bg-green-700" : ""}
+                              className={`h-8 px-3 text-xs font-semibold rounded-xl ${!product.is_approved ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-none"}`}
                               disabled={actionLoading === product.id}
                               onClick={() => handleToggleApproval("product", product.id, product.is_approved)}
                             >
-                              {actionLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                                (product.is_approved ? <><XCircle className="w-4 h-4 mr-2" /> Revoke</> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>)}
+                              {actionLoading === product.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                                (product.is_approved ? <><XCircle className="w-3.5 h-3.5 mr-1.5" /> Revoke</> : <><CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Approve</>)}
                             </Button>
                           </td>
                         </tr>
@@ -340,14 +343,14 @@ export default function ApprovalsPage() {
               </div>
 
               {/* Mobile View Cards */}
-              <div className="md:hidden divide-y divide-gray-200">
+              <div className="md:hidden divide-y divide-slate-100">
                 {products.length === 0 ? (
-                  <div className="px-6 py-10 text-center text-gray-500 italic">No products found</div>
+                  <div className="px-6 py-10 text-center text-slate-400 text-xs italic">No products found</div>
                 ) : (
                   products.map((product) => (
-                    <div key={product.id} className="p-4 space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 relative rounded border overflow-hidden flex-shrink-0">
+                    <div key={product.id} className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 relative rounded-xl border border-slate-200 overflow-hidden flex-shrink-0 bg-slate-50">
                           {product.product_photo_urls?.[0] ? (
                             <Image
                               src={supabase.storage.from("product-media").getPublicUrl(product.product_photo_urls[0]).data.publicUrl}
@@ -357,27 +360,27 @@ export default function ApprovalsPage() {
                               unoptimized
                             />
                           ) : (
-                            <div className="w-full h-full bg-gray-50 flex items-center justify-center"><Package className="w-6 h-6 text-gray-300" /></div>
+                            <div className="w-full h-full bg-slate-50 flex items-center justify-center"><Package className="w-5 h-5 text-slate-300" /></div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-gray-900 truncate">{product.product_name}</p>
-                          <p className="text-xs font-bold text-green-700 uppercase tracking-tight">{product.company_name || "Unknown"}</p>
+                          <p className="font-semibold text-xs text-slate-900 truncate">{product.product_name}</p>
+                          <p className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider">{product.company_name || "Unknown"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${product.is_approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${product.is_approved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                           {product.is_approved ? 'Approved' : 'Pending'}
                         </span>
                         <Button
                           size="sm"
                           variant={product.is_approved ? "destructive" : "default"}
-                          className={!product.is_approved ? "bg-green-600 hover:bg-green-700" : ""}
+                          className={`h-8 px-3 text-xs font-semibold rounded-xl ${!product.is_approved ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs" : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-none"}`}
                           disabled={actionLoading === product.id}
                           onClick={() => handleToggleApproval("product", product.id, product.is_approved)}
                         >
-                          {actionLoading === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                            (product.is_approved ? <><XCircle className="w-4 h-4 mr-2" /> Revoke</> : <><CheckCircle className="w-4 h-4 mr-2" /> Approve</>)}
+                          {actionLoading === product.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                            (product.is_approved ? <><XCircle className="w-3.5 h-3.5 mr-1.5" /> Revoke</> : <><CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Approve</>)}
                         </Button>
                       </div>
                     </div>

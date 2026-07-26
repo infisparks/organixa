@@ -57,6 +57,7 @@ interface Order {
     resolved_order_items?: OrderItemWithProduct[]
     payment_method?: string | null
     payment_status?: string | null
+    cod_charges?: number | null
 }
 
 // =========================================================================
@@ -290,9 +291,12 @@ export default function OrderDetailsPage() {
     }, 0)
     
     const grandTotal = Number(order.total_amount)
+    const codCharges = order.cod_charges !== undefined && order.cod_charges !== null 
+        ? Number(order.cod_charges) 
+        : (order.payment_method === 'cod' ? 100 : 0)
     
-    // Dynamic Shipping Calculation: If DB total is 349 and items are 250, shipping is 99.
-    const calculatedShipping = grandTotal - subtotal
+    // Dynamic Shipping Calculation accounting for COD fee
+    const calculatedShipping = grandTotal - subtotal - codCharges
     const shipping = calculatedShipping > 0 ? calculatedShipping : 0
 
     return (
@@ -438,6 +442,12 @@ export default function OrderDetailsPage() {
                                         <span>Shipping & Handling</span>
                                         <span className="font-medium text-slate-900">{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
                                     </div>
+                                    {codCharges > 0 && (
+                                        <div className="flex justify-between items-center text-amber-800 font-medium">
+                                            <span>COD Handling Fee</span>
+                                            <span>+₹{codCharges.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
                                         <span className="font-bold text-slate-900 text-base">Grand Total</span>
                                         <span className="text-lg font-black text-purple-700 tracking-tight">₹{grandTotal.toFixed(2)}</span>

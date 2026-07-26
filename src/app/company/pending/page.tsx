@@ -107,20 +107,20 @@ export default function PendingApprovalPage() {
           </div>
 
           {/* Title & Description */}
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-[#111827]">Approval Pending</h2>
-            <p className="text-sm text-[#6B7280]">
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold text-[#111827]">Approval Pending</h2>
+            <p className="text-xs text-[#6B7280]">
               Thank you for registering <span className="font-semibold text-indigo-600">{companyName}</span>.
             </p>
           </div>
 
           {/* Status Message */}
           <div className="border-t border-[#E5E7EB] pt-6 space-y-4 text-left">
-            <p className="text-sm text-[#6B7280] leading-relaxed">
+            <p className="text-xs text-[#6B7280] leading-relaxed">
               Your industrial partner application is currently under review by the Organicza administration. We verify all registrations to maintain quality and security across our platform.
             </p>
-            <div className="bg-slate-50 rounded-lg p-4 border border-[#E5E7EB] space-y-2">
-              <span className="text-xs font-semibold text-[#111827] uppercase tracking-wider block">Expected Timeframe</span>
+            <div className="bg-slate-50 rounded-xl p-4 border border-[#E5E7EB] space-y-1.5">
+              <span className="text-[11px] font-semibold text-[#111827] uppercase tracking-wider block">Expected Timeframe</span>
               <p className="text-xs text-[#6B7280]">
                 Reviews are typically completed within 24 to 48 hours. You will receive access to your partner dashboard immediately upon approval.
               </p>
@@ -130,7 +130,7 @@ export default function PendingApprovalPage() {
           {/* Contact Support details */}
           <div className="border-t border-[#E5E7EB] pt-6 text-center space-y-3">
             <span className="text-xs font-medium text-[#6B7280]">Need urgent approval or assistance?</span>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm text-[#111827]">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs font-medium text-[#111827]">
               <a href="mailto:organicza2025@gmail.com" id="support-email" className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors">
                 <Mail className="w-4 h-4 text-[#6B7280]" />
                 organicza2025@gmail.com
@@ -148,7 +148,7 @@ export default function PendingApprovalPage() {
             <Button
               id="btn-check-status"
               onClick={() => window.location.reload()}
-              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+              className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-colors text-xs"
             >
               Check Status
             </Button>
@@ -156,7 +156,7 @@ export default function PendingApprovalPage() {
               id="btn-pending-logout"
               variant="outline"
               onClick={handleLogout}
-              className="w-full h-11 border border-[#E5E7EB] text-red-600 hover:bg-red-50 hover:text-red-700 font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full h-10 border border-[#E5E7EB] text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 text-xs"
             >
               <LogOut className="w-4 h-4" />
               Logout / Switch Account

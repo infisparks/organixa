@@ -189,7 +189,7 @@ export default function ProductCard({ product, index = 0, onFavToggle }: Product
           {/* Top-Left Orange/Golden Discount Badge */}
           {discountPercent > 0 && (
             <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
-              <span className="inline-block bg-[#c26510] text-white text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-sm">
+              <span className="inline-block bg-[#c26510] text-white text-[10px] sm:text-[11px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
                 {discountPercent}% OFF
               </span>
             </div>
@@ -201,7 +201,7 @@ export default function ProductCard({ product, index = 0, onFavToggle }: Product
             disabled={favLoading}
             className={`absolute top-2.5 right-2.5 p-1.5 sm:p-2 rounded-full backdrop-blur-md transition-all duration-300 z-20 shadow-xs 
               ${favLoading ? "opacity-50 cursor-not-allowed" : "opacity-100 cursor-pointer"}
-              ${isFav ? "bg-red-50 text-red-500 shadow-sm" : "bg-white/80 text-slate-400 hover:text-slate-700 hover:bg-white"}`}
+              ${isFav ? "bg-red-50 text-red-500 shadow-xs" : "bg-white/80 text-slate-400 hover:text-slate-700 hover:bg-white"}`}
             aria-label={isFav ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${isFav ? "fill-current scale-110" : "scale-100"}`} />
@@ -232,7 +232,7 @@ export default function ProductCard({ product, index = 0, onFavToggle }: Product
                   ₹{product.original_price.toFixed(2)}
                 </span>
               )}
-              <span className={`text-sm sm:text-base font-bold ${
+              <span className={`text-sm sm:text-base font-semibold ${
                 discountPercent > 0 ? "text-[#0e7e52]" : "text-[#c26510]"
               }`}>
                 ₹{product.discount_price.toFixed(2)}

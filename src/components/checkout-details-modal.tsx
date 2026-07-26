@@ -87,7 +87,8 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
 
   const subtotal = items.reduce((sum, item) => sum + item.price_at_add * item.quantity, 0)
   const shippingFee = subtotal > 0 && subtotal < 1000 ? 99 : 0
-  const totalAmount = subtotal + shippingFee
+  const codFee = paymentMethod === "cod" ? 100 : 0
+  const totalAmount = subtotal + shippingFee + codFee
 
   // Fetch user profile
   useEffect(() => {
@@ -276,6 +277,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
             p_items: items,
             p_shipping_cost: shippingFee,
             p_tax_amount: 0,
+            p_cod_charges: codFee,
           }
         )
 
@@ -409,6 +411,7 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
           p_payment_method: "razorpay",
           p_shipping_cost: shippingFee,
           p_tax_amount: 0,
+          p_cod_charges: 0,
         }
       )
 
@@ -729,8 +732,11 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
                 >
                   <RadioGroupItem value="cod" id="payment-cod" className="text-purple-600 border-purple-600 focus-visible:ring-purple-500" />
                   <div className="flex flex-col">
-                    <span className="font-semibold text-sm text-gray-950">Cash on Delivery</span>
-                    <span className="text-xs text-gray-500">Pay cash on delivery</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-sm text-gray-950">Cash on Delivery</span>
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full border border-amber-200">+₹100 Fee</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Pay cash on delivery (Extra ₹100 COD Charge)</span>
                   </div>
                 </Label>
               </div>
@@ -742,11 +748,11 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
             }`}>
               {paymentMethod === "cod" ? (
                 <p>
-                  <span className="font-bold">Cash on Delivery selected:</span> You will pay exactly <span className="font-bold text-gray-950">₹{totalAmount.toFixed(2)}</span> in cash to the delivery agent. No online payment is needed right now.
+                  <span className="font-bold">Cash on Delivery selected:</span> You will pay exactly <span className="font-bold text-gray-950">₹{totalAmount.toFixed(2)}</span> in cash to the delivery agent (includes <span className="font-bold text-amber-900">₹100 COD handling charge</span>). No online payment is needed right now.
                 </p>
               ) : (
                 <p>
-                  <span className="font-bold">Secure Online Payment:</span> You will be redirected to pay <span className="font-bold text-gray-950">₹{totalAmount.toFixed(2)}</span> securely via Razorpay (UPI, Card, Netbanking).
+                  <span className="font-bold">Secure Online Payment:</span> You will be redirected to pay <span className="font-bold text-gray-950">₹{totalAmount.toFixed(2)}</span> securely via Razorpay (UPI, Card, Netbanking). No COD charge applied.
                 </p>
               )}
             </div>
@@ -785,6 +791,12 @@ export default function CheckoutDetailsModal({ isOpen, onClose, items, onOrderSu
                 <span>Shipping Fee</span>
                 <span className="font-medium text-gray-900">{shippingFee === 0 ? "Free" : `₹${shippingFee.toFixed(2)}`}</span>
               </div>
+              {paymentMethod === "cod" && (
+                <div className="flex justify-between text-amber-700 font-semibold bg-amber-50/80 p-1.5 rounded-md border border-amber-200/60">
+                  <span>COD Handling Charge</span>
+                  <span>+₹100.00</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-lg text-gray-950 pt-2.5 border-t border-gray-200">
                 <span>Total Payable</span>
                 <span className="text-xl font-black text-purple-700">₹{totalAmount.toFixed(2)}</span>

@@ -187,18 +187,18 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
 
     if (loadingCompanyInfo) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-100">
-                <Loader2 className="h-10 w-10 animate-spin text-green-600" />
-                <span className="ml-3 text-lg text-green-700">Loading company dashboard...</span>
+            <div className="min-h-screen flex items-center justify-center bg-[#F5F6F8] font-sans">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                <span className="ml-3 text-sm font-medium text-slate-700">Loading dashboard...</span>
             </div>
         )
     }
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
+        <div className="flex min-h-screen bg-[#F5F6F8] font-sans selection:bg-indigo-100">
             {/* Desktop Sidebar (fixed position, hidden on mobile) */}
             <aside
-                className={`hidden lg:flex fixed inset-y-0 left-0 z-20 flex-col border-r border-gray-200 bg-white shadow-sm py-6 transition-all duration-300 ease-in-out ${
+                className={`hidden lg:flex fixed inset-y-0 left-0 z-20 flex-col border-r border-slate-200 bg-white shadow-sm py-6 transition-all duration-300 ease-in-out ${
                     isSidebarCollapsed ? "w-20 items-center" : "w-64"
                 }`}
             >
@@ -206,17 +206,26 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
                     className={`flex items-center px-4 mb-8 ${isSidebarCollapsed ? "justify-center" : "justify-between"} w-full`}
                 >
                     {!isSidebarCollapsed && (
-                        <Link href="/company/dashboard" className="flex items-center gap-2">
+                        <Link href="/company/dashboard" className="flex items-center gap-3">
                             {companyInfo?.company_logo_url ? (
                                 <img
                                     src={companyInfo.company_logo_url || "/placeholder.svg"}
                                     alt={`${companyInfo.company_name} Logo`}
-                                    className="h-8 w-8 rounded-full object-cover"
+                                    className="h-9 w-9 rounded-xl object-cover border border-slate-200 shadow-sm"
                                 />
                             ) : (
-                                <Building className="h-8 w-8 text-green-600" />
+                                <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                                    <Building className="h-5 w-5" />
+                                </div>
                             )}
-                            <span className="text-xl font-bold text-gray-900">{companyInfo?.company_name || "Company"}</span>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-semibold text-slate-900 truncate max-w-[130px]">
+                                    {companyInfo?.company_name || "Company"}
+                                </span>
+                                <span className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider">
+                                    {isAdmin ? "Admin Console" : "Partner Portal"}
+                                </span>
+                            </div>
                         </Link>
                     )}
                     {/* DESKTOP TOGGLE BUTTON */}
@@ -224,41 +233,44 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
                         variant="ghost"
                         size="icon"
                         onClick={toggleSidebar}
-                        className="h-10 w-10"
+                        className="h-8 w-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
                         aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                     >
-                        {isSidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+                        {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
                     </Button>
                 </div>
 
-                <nav className="flex-1 px-2 space-y-1">
-                    {navItems.map((item) => (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
-                                pathname === item.href
-                                    ? "bg-green-100 text-green-700"
-                                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                            } ${isSidebarCollapsed ? "justify-center" : ""}`}
-                            aria-current={pathname === item.href ? "page" : undefined}
-                        >
-                            <item.icon className={`h-5 w-5 ${isSidebarCollapsed ? "" : "flex-shrink-0"}`} />
-                            {!isSidebarCollapsed && <span>{item.name}</span>}
-                            {isSidebarCollapsed && <span className="sr-only">{item.name}</span>}
-                        </Link>
-                    ))}
+                <nav className="flex-1 px-3 space-y-1.5">
+                    {navItems.map((item) => {
+                        const isActive = pathname === item.href
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                                    isActive
+                                        ? "bg-indigo-50 text-indigo-700 shadow-xs border-l-4 border-indigo-600"
+                                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                } ${isSidebarCollapsed ? "justify-center px-0" : ""}`}
+                                aria-current={isActive ? "page" : undefined}
+                            >
+                                <item.icon className={`h-4 w-4 transition-colors ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                                {!isSidebarCollapsed && <span>{item.name}</span>}
+                                {isSidebarCollapsed && <span className="sr-only">{item.name}</span>}
+                            </Link>
+                        )
+                    })}
                 </nav>
 
-                <div className={`px-4 mt-auto ${isSidebarCollapsed ? "flex justify-center" : ""}`}>
+                <div className={`px-3 mt-auto ${isSidebarCollapsed ? "flex justify-center" : ""}`}>
                     <Button
                         variant="ghost"
-                        className={`w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700 ${
-                            isSidebarCollapsed ? "justify-center" : ""
+                        className={`w-full justify-start text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl py-2.5 ${
+                            isSidebarCollapsed ? "justify-center px-0" : ""
                         }`}
                         onClick={handleLogout}
                     >
-                        <LogOut className={`h-5 w-5 ${isSidebarCollapsed ? "" : "mr-3"}`} />
+                        <LogOut className={`h-4 w-4 ${isSidebarCollapsed ? "" : "mr-2.5"}`} />
                         {!isSidebarCollapsed && <span>Logout</span>}
                         {isSidebarCollapsed && <span className="sr-only">Logout</span>}
                     </Button>
@@ -267,52 +279,63 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
 
             {/* Mobile Sheet (Sidebar) - Opened by the header button */}
             <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-                {/* SheetTrigger is no longer needed here as it's moved to the header. */}
-                <SheetContent side="left" className="p-0 w-64">
+                <SheetContent side="left" className="p-0 w-64 border-r border-slate-200">
                     <SheetHeader className="sr-only">
                         <SheetTitle>Navigation Menu</SheetTitle>
                         <SheetDescription>Access dashboard, products, and account settings.</SheetDescription>
                     </SheetHeader>
-                    <div className="flex flex-col h-full bg-white border-r border-gray-200 py-6">
+                    <div className="flex flex-col h-full bg-white py-6">
                         <div className="flex items-center px-4 mb-8">
-                            <Link href="/company/dashboard" className="flex items-center gap-2">
+                            <Link href="/company/dashboard" className="flex items-center gap-3">
                                 {companyInfo?.company_logo_url ? (
                                     <img
                                         src={companyInfo.company_logo_url || "/placeholder.svg"}
                                         alt={`${companyInfo.company_name} Logo`}
-                                        className="h-8 w-8 rounded-full object-cover"
+                                        className="h-9 w-9 rounded-xl object-cover border border-slate-200 shadow-sm"
                                     />
                                 ) : (
-                                    <Building className="h-8 w-8 text-green-600" />
+                                    <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                                        <Building className="h-5 w-5" />
+                                    </div>
                                 )}
-                                <span className="text-xl font-bold text-gray-900">{companyInfo?.company_name || "Company"}</span>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-semibold text-slate-900 truncate">
+                                        {companyInfo?.company_name || "Company"}
+                                    </span>
+                                    <span className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider">
+                                        {isAdmin ? "Admin Console" : "Partner Portal"}
+                                    </span>
+                                </div>
                             </Link>
                         </div>
-                        <nav className="flex-1 px-2 space-y-1">
-                            {navItems.map((item) => (
-                                <Link
-                                    key={item.name}
-                                    href={item.href}
-                                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
-                                        pathname === item.href
-                                            ? "bg-green-100 text-green-700"
-                                            : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                                    }`}
-                                    aria-current={pathname === item.href ? "page" : undefined}
-                                    onClick={() => setIsMobileSheetOpen(false)} // Close sheet on navigation
-                                >
-                                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                                    <span>{item.name}</span>
-                                </Link>
-                            ))}
+                        <nav className="flex-1 px-3 space-y-1.5">
+                            {navItems.map((item) => {
+                                const isActive = pathname === item.href
+                                return (
+                                    <Link
+                                        key={item.name}
+                                        href={item.href}
+                                        className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                                            isActive
+                                                ? "bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600"
+                                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                        }`}
+                                        aria-current={isActive ? "page" : undefined}
+                                        onClick={() => setIsMobileSheetOpen(false)}
+                                    >
+                                        <item.icon className={`h-4 w-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                                        <span>{item.name}</span>
+                                    </Link>
+                                )
+                            })}
                         </nav>
-                        <div className="px-4 mt-auto">
+                        <div className="px-3 mt-auto">
                             <Button
                                 variant="ghost"
-                                className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+                                className="w-full justify-start text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl"
                                 onClick={handleLogout}
                             >
-                                <LogOut className="h-5 w-5 mr-3" />
+                                <LogOut className="h-4 w-4 mr-2.5" />
                                 <span>Logout</span>
                             </Button>
                         </div>
@@ -324,19 +347,21 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
             <div
                 className={`flex flex-col flex-1 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? "lg:ml-20" : "lg:ml-64"}`}
             >
-                {/* 💡 NEW MOBILE HEADER */}
-                <header className="sticky top-0 z-10 lg:hidden flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white shadow-sm">
-                    <div className="flex items-center gap-2">
+                {/* MOBILE HEADER */}
+                <header className="sticky top-0 z-10 lg:hidden flex items-center justify-between h-14 px-4 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
+                    <div className="flex items-center gap-2.5">
                         {companyInfo?.company_logo_url ? (
                             <img
                                 src={companyInfo.company_logo_url || "/placeholder.svg"}
                                 alt={`${companyInfo.company_name} Logo`}
-                                className="h-8 w-8 rounded-full object-cover"
+                                className="h-7 w-7 rounded-lg object-cover border border-slate-200"
                             />
                         ) : (
-                            <Building className="h-8 w-8 text-green-600" />
+                            <div className="h-7 w-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                <Building className="h-4 w-4" />
+                            </div>
                         )}
-                        <span className="text-xl font-bold text-gray-900">{companyInfo?.company_name || "Dashboard"}</span>
+                        <span className="text-xs font-semibold text-slate-900">{companyInfo?.company_name || "Dashboard"}</span>
                     </div>
                     {/* MOBILE TOGGLE BUTTON */}
                     <Button
@@ -344,11 +369,11 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
                         size="icon"
                         onClick={() => setIsMobileSheetOpen(true)}
                         aria-label="Open sidebar menu"
+                        className="h-8 w-8 text-slate-600"
                     >
-                        <Menu className="h-6 w-6" />
+                        <Menu className="h-5 w-5" />
                     </Button>
                 </header>
-                {/* End NEW MOBILE HEADER */}
 
                 {/* Main content area */}
                 <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>

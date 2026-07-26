@@ -131,21 +131,21 @@ export default function MyProductsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] font-sans text-slate-900 pb-20">
+    <div className="min-h-screen bg-[#F5F6F8] font-sans text-slate-900 pb-20 selection:bg-indigo-100">
       
       {/* Dashboard Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded bg-slate-900 text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
               <Package className="h-4 w-4" />
             </div>
             <div>
-              <h1 className="text-sm font-bold tracking-tight text-slate-900 leading-none">Product Inventory</h1>
-              <p className="text-[10px] font-medium text-slate-500 mt-0.5">Manage your catalog</p>
+              <h1 className="text-sm font-semibold tracking-tight text-slate-900 leading-none">Product Inventory</h1>
+              <p className="text-[11px] font-medium text-slate-500 mt-0.5">Manage your catalog items</p>
             </div>
           </div>
-          <Button asChild className="h-8 px-3 text-xs bg-slate-900 hover:bg-slate-800 text-white rounded shadow-sm font-medium">
+          <Button asChild className="h-8 px-3.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs font-semibold">
             <Link href="/company/dashboard/add-product" className="flex items-center gap-1.5">
               <Plus className="h-3.5 w-3.5" /> New Product
             </Link>
@@ -159,7 +159,7 @@ export default function MyProductsPage() {
         {!loading && products.length > 0 && (
           <div className="flex items-center justify-between mb-4">
             <div className="text-xs font-semibold text-slate-500">
-              Total Products: <span className="text-slate-900">{products.length}</span>
+              Total Products: <span className="text-slate-900 font-semibold">{products.length}</span>
             </div>
           </div>
         )}
@@ -167,15 +167,14 @@ export default function MyProductsPage() {
         {/* Product Grid */}
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-            {/* THIS IS THE FIXED LINE */}
             {Array(8).fill(0).map((_, i) => <ProductSkeleton key={i} />)}
           </div>
         ) : products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-slate-200 rounded-lg text-center">
+          <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-slate-200 rounded-2xl text-center">
             <PackageX className="h-8 w-8 text-slate-300 mb-3" />
             <p className="text-sm font-semibold text-slate-800 mb-1">No products found</p>
-            <p className="text-[11px] text-slate-500 mb-5 max-w-[220px]">Your inventory is currently empty. Add your first product to get started.</p>
-            <Button asChild className="h-8 px-4 text-xs bg-slate-900 hover:bg-slate-800 text-white rounded font-medium">
+            <p className="text-xs text-slate-500 mb-5 max-w-[220px]">Your inventory is currently empty. Add your first product to get started.</p>
+            <Button asChild className="h-9 px-4 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-xs">
               <Link href="/company/dashboard/add-product">Add Product</Link>
             </Button>
           </div>
@@ -184,7 +183,7 @@ export default function MyProductsPage() {
             {products.map((product) => (
               <div
                 key={product.id}
-                className="group flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-slate-300 hover:shadow-sm transition-all duration-200"
+                className="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 hover:shadow-sm transition-all duration-200"
               >
                 {/* Image Section */}
                 <div className="relative aspect-square bg-slate-50 overflow-hidden border-b border-slate-100">
@@ -203,7 +202,7 @@ export default function MyProductsPage() {
                   
                   {/* Status Badge Overlaid */}
                   <div className="absolute top-2 right-2">
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shadow-sm backdrop-blur-md ${
+                    <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs backdrop-blur-md ${
                       product.is_approved 
                         ? "bg-emerald-500/90 text-white" 
                         : "bg-amber-500/90 text-white"
@@ -216,16 +215,16 @@ export default function MyProductsPage() {
                 {/* Content Section */}
                 <div className="p-3 flex flex-col flex-grow justify-between">
                   <div>
-                    <h3 className="text-xs font-semibold text-slate-900 line-clamp-2 leading-tight mb-1.5 group-hover:text-blue-600 transition-colors">
+                    <h3 className="text-xs font-semibold text-slate-900 line-clamp-2 leading-snug mb-1.5 group-hover:text-indigo-600 transition-colors">
                       {product.product_name}
                     </h3>
                     
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-sm font-bold text-slate-900">
+                      <span className="text-sm font-semibold text-slate-900">
                         ₹{product.discount_price.toFixed(2)}
                       </span>
                       {product.original_price > product.discount_price && (
-                        <span className="text-[9px] text-slate-400 line-through">
+                        <span className="text-[10px] text-slate-400 line-through">
                           ₹{product.original_price.toFixed(2)}
                         </span>
                       )}
@@ -236,7 +235,7 @@ export default function MyProductsPage() {
                   <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-1 text-[10px] font-medium">
                       <span className="text-slate-400 uppercase">Stock:</span>
-                      <span className={`${product.stock_quantity > 0 ? "text-slate-700" : "text-red-500"}`}>
+                      <span className={`${product.stock_quantity > 0 ? "text-slate-700 font-semibold" : "text-rose-500 font-semibold"}`}>
                         {product.stock_quantity}
                       </span>
                     </div>
@@ -245,7 +244,7 @@ export default function MyProductsPage() {
                       variant="ghost"
                       size="sm"
                       asChild
-                      className="h-6 px-2 rounded text-[10px] font-semibold bg-slate-50 text-slate-600 hover:bg-slate-900 hover:text-white transition-colors"
+                      className="h-6 px-2.5 rounded-lg text-[10px] font-semibold bg-slate-50 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors"
                     >
                       <Link href={`/company/dashboard/edit-product/${product.id}`}>
                         Edit
