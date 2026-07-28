@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Leaf, Facebook, Instagram, Twitter, Linkedin, Mail, Phone } from "lucide-react"
 
 export default function Footer() {
@@ -11,8 +12,13 @@ export default function Footer() {
           {/* Company Info */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2 text-white">
-              <Leaf className="h-8 w-8 text-green-500" />
-              <span className="text-2xl font-bold">organicza</span>
+              <Image
+                src="/logo-dark.png"
+                alt="organicza logo"
+                width={200}
+                height={60}
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
             </Link>
             <p className="text-sm leading-relaxed">
               Your trusted source for premium organic products, delivered fresh to your door.

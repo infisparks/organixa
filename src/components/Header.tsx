@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { ShoppingCart, Heart, Search, Leaf, Menu, X } from "lucide-react"
 import { supabase } from "@/lib/supabase" // Supabase import
@@ -16,6 +17,7 @@ interface HeaderProps {
 
 export default function Header({ showSearchBar = true, onSearch }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const [cartCount, setCartCount] = useState(0)
   const [favCount, setFavCount] = useState(0)
   const [user, setUser] = useState<any>(null)
@@ -125,118 +127,160 @@ export default function Header({ showSearchBar = true, onSearch }: HeaderProps) 
 
   return (
     <nav className="bg-white border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-        {/* Mobile Menu Button & Logo Group */}
-        <div className="flex items-center gap-3">
-          <button
-            className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
-            onClick={() => setIsMobileMenuOpen(true)}
-            aria-label="Open mobile menu"
-          >
-            <Menu className="w-6 h-6 text-gray-600" />
-          </button>
-          {/* Logo (Main Header) - Hide Leaf icon on mobile (md:flex) */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <Leaf className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 md:flex hidden group-hover:rotate-12 transition-transform duration-300" />
-            <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">organicza</span>
-          </Link>
-        </div>
-
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
-          <Link href="/" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
-            Home
-          </Link>
-          <Link href="/shop" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
-            Shop
-          </Link>
-          <Link href="/orders" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
-            Orders
-          </Link>
-          {isApprovedCompany && (
-            <Link href="/company/dashboard" className="text-gray-900 hover:text-green-600 font-bold transition-colors flex items-center gap-1">
-              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs uppercase tracking-wider">Merchant Dashboard</span>
-            </Link>
-          )}
-          {user ? (
-            <>
-              <Link href="/profile" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
-                Profile
-              </Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5">
+        {/* Mobile Expanded Search View */}
+        {isMobileSearchOpen && showSearchBar ? (
+          <div className="flex sm:hidden items-center gap-2 w-full py-1">
+            <button
+              onClick={() => setIsMobileSearchOpen(false)}
+              className="p-2 hover:bg-gray-100 rounded-full text-gray-600 flex-shrink-0"
+              aria-label="Close search"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <div className="relative flex-grow">
+              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Search products..."
+                value={localSearchTerm}
+                onChange={handleSearchInputChange}
+                autoFocus
+                className="pl-10 pr-8 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-full focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              {localSearchTerm && (
+                <button
+                  onClick={() => handleSearchInputChange({ target: { value: '' } } as any)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                  aria-label="Clear search text"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Normal Header View (Desktop & Default Mobile) */
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            {/* Mobile Menu Button & Logo Group */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <button
-                onClick={handleLogout}
-                className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+                className="md:hidden p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
+                onClick={() => setIsMobileMenuOpen(true)}
+                aria-label="Open mobile menu"
               >
-                Logout
+                <Menu className="w-6 h-6 text-gray-600" />
               </button>
-            </>
-          ) : (
-            <Link href="/login" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
-              Login
-            </Link>
-          )}
-        </div>
-
-        {/* Right Section (Search & Icons) */}
-        <div className="flex items-center gap-3 sm:gap-6">
-          {/* Search Bar (Mobile & Desktop) */}
-          {showSearchBar && (
-            <>
-              {/* Desktop Search Input (sm and up) */}
-              <div className="hidden sm:block relative">
-                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-                <Input
-                  type="text"
-                  placeholder="Search products..."
-                  value={localSearchTerm}
-                  onChange={handleSearchInputChange}
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-[140px] sm:w-[180px] lg:w-[220px] focus:ring-green-500 focus:border-green-500 transition-all duration-300"
+              {/* Logo (Main Header) */}
+              <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
+                <Image
+                  src="/logo.png"
+                  alt="organicza logo"
+                  width={240}
+                  height={80}
+                  className="h-10 sm:h-14 lg:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                  priority
                 />
-              </div>
-              {/* Mobile Search Input (only on xs screen) */}
-              <div className="sm:hidden relative flex-grow">
-                <Search className="w-6 h-6 text-gray-600 absolute left-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
-                <Input
-                  type="text"
-                  placeholder="Search..."
-                  value={localSearchTerm}
-                  onChange={handleSearchInputChange}
-                  // FIX: Adjusted width to fill space better on mobile
-                  className="pl-10 pr-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-full focus:ring-green-500 focus:border-green-500"
-                />
-              </div>
-            </>
-          )}
+              </Link>
+            </div>
 
-          {/* Favorites Icon */}
-          <Link href="/addfav" className="relative flex-shrink-0" aria-label="View favorites">
-            <Heart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
-            {favCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-pink-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
-                {favCount}
-              </span>
-            )}
-          </Link>
-          {/* Shopping Cart Icon */}
-          <Link href="/cart" className="relative flex-shrink-0" aria-label="View shopping cart">
-            <ShoppingCart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-green-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
-                {cartCount}
-              </span>
-            )}
-          </Link>
-        </div>
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
+              <Link href="/" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                Home
+              </Link>
+              <Link href="/shop" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                Shop
+              </Link>
+              <Link href="/orders" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                Orders
+              </Link>
+              {isApprovedCompany && (
+                <Link href="/company/dashboard" className="text-gray-900 hover:text-green-600 font-bold transition-colors flex items-center gap-1">
+                  <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs uppercase tracking-wider">Merchant Dashboard</span>
+                </Link>
+              )}
+              {user ? (
+                <>
+                  <Link href="/profile" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                    Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                  Login
+                </Link>
+              )}
+            </div>
+
+            {/* Right Section (Search Icon & Actions) */}
+            <div className="flex items-center gap-2 sm:gap-6 flex-shrink-0">
+              {showSearchBar && (
+                <>
+                  {/* Desktop Search Input (sm and up) */}
+                  <div className="hidden sm:block relative">
+                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="Search products..."
+                      value={localSearchTerm}
+                      onChange={handleSearchInputChange}
+                      className="pl-10 pr-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none w-[140px] sm:w-[180px] lg:w-[220px] focus:ring-green-500 focus:border-green-500 transition-all duration-300"
+                    />
+                  </div>
+                  {/* Mobile Search Icon Button (Click to open full search bar) */}
+                  <button
+                    onClick={() => setIsMobileSearchOpen(true)}
+                    className="sm:hidden p-2 hover:bg-gray-100 rounded-full text-gray-600 flex-shrink-0 transition-colors"
+                    aria-label="Open search bar"
+                  >
+                    <Search className="w-6 h-6" />
+                  </button>
+                </>
+              )}
+
+              {/* Favorites Icon */}
+              <Link href="/addfav" className="relative flex-shrink-0 p-1" aria-label="View favorites">
+                <Heart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
+                {favCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
+                    {favCount}
+                  </span>
+                )}
+              </Link>
+              {/* Shopping Cart Icon */}
+              <Link href="/cart" className="relative flex-shrink-0 p-1" aria-label="View shopping cart">
+                <ShoppingCart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden">
           <div className="fixed inset-y-0 left-0 w-[80%] max-w-sm bg-white shadow-xl">
             <div className="p-4 border-b flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Leaf className="h-6 w-6 text-green-600" />
-                {/* Mobile Menu Title is explicitly removed here */}
-              </div>
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                <Image
+                  src="/logo.png"
+                  alt="organicza logo"
+                  width={160}
+                  height={50}
+                  className="h-10 w-auto object-contain"
+                />
+              </Link>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg"
