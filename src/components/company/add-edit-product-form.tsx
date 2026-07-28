@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
-const availableNutrients = ["Protein", "Fat", "Carbs", "Fiber", "Calcium", "Iron", "Vitamin C", "Vitamin D"]
+const availableNutrients = ["Protein", "Fat", "Carbs", "Fiber", "Calcium", "Iron", "Vitamin C", "Vitamin D", "Custom"]
 
 const categoryOptions: { [key: string]: string[] } = {
   "Organic Groceries & Superfoods": [
@@ -194,6 +194,7 @@ export function AddEditProductForm({
 
   // Local states for nutrient and category selection.
   const [selectedNutrient, setSelectedNutrient] = useState(availableNutrients[0])
+  const [customNutrientName, setCustomNutrientName] = useState("")
   const [nutrientValue, setNutrientValue] = useState("")
   const mainCategoryKeys = Object.keys(categoryOptions)
   const [selectedMainCategory, setSelectedMainCategory] = useState(mainCategoryKeys[0])
@@ -324,6 +325,17 @@ export function AddEditProductForm({
 
   // Handler for adding a nutrient.
   const handleAddNutrient = () => {
+    const finalNutrientName = selectedNutrient === "Custom" ? customNutrientName.trim() : selectedNutrient.trim()
+
+    if (!finalNutrientName) {
+      toast({
+        title: "Nutrient name required",
+        description: "Please select or enter a nutrient name",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!nutrientValue.trim()) {
       toast({
         title: "Value required",
@@ -332,16 +344,21 @@ export function AddEditProductForm({
       })
       return
     }
-    if (nutrientFields.find((n) => n.name === selectedNutrient)) {
+
+    if (nutrientFields.some((n) => n.name.toLowerCase() === finalNutrientName.toLowerCase())) {
       toast({
         title: "Nutrient already added",
-        description: `${selectedNutrient} is already in the list`,
+        description: `"${finalNutrientName}" is already in the list`,
         variant: "destructive",
       })
       return
     }
-    appendNutrient({ name: selectedNutrient, value: nutrientValue })
+
+    appendNutrient({ name: finalNutrientName, value: nutrientValue.trim() })
     setNutrientValue("")
+    if (selectedNutrient === "Custom") {
+      setCustomNutrientName("")
+    }
     setError("")
   }
 
@@ -736,26 +753,49 @@ export function AddEditProductForm({
                   Add nutritional details to help customers make informed choices (optional)
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Select value={selectedNutrient} onValueChange={setSelectedNutrient}>
-                  <SelectTrigger className="w-full sm:w-1/3 h-11">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                <Select
+                  value={selectedNutrient}
+                  onValueChange={(value) => {
+                    setSelectedNutrient(value)
+                    if (value !== "Custom") {
+                      setCustomNutrientName("")
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:flex-1 h-11 min-w-[140px]">
                     <SelectValue placeholder="Select nutrient" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableNutrients.map((nutrient) => (
                       <SelectItem key={nutrient} value={nutrient}>
-                        {nutrient}
+                        {nutrient === "Custom" ? "Custom (Type manually)" : nutrient}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+
+                {selectedNutrient === "Custom" && (
+                  <Input
+                    value={customNutrientName}
+                    onChange={(e) => setCustomNutrientName(e.target.value)}
+                    placeholder="Nutrient name (e.g., Sodium)"
+                    className="w-full sm:flex-1 h-11 min-w-[160px]"
+                  />
+                )}
+
                 <Input
                   value={nutrientValue}
                   onChange={(e) => setNutrientValue(e.target.value)}
                   placeholder="Enter value (e.g., 2g, 150mg)"
-                  className="w-full sm:w-1/3 h-11"
+                  className="w-full sm:flex-1 h-11 min-w-[160px]"
                 />
-                <Button type="button" onClick={handleAddNutrient} className="w-full sm:w-auto h-11 bg-slate-900 hover:bg-black text-white font-bold rounded-xl h-11 transition-all">
+
+                <Button
+                  type="button"
+                  onClick={handleAddNutrient}
+                  className="w-full sm:w-auto h-11 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-all"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add
                 </Button>
