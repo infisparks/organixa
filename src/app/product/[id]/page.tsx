@@ -3,6 +3,10 @@ import { notFound } from "next/navigation"
 import { supabase } from "../../../lib/supabase"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
+import { parseNutrients } from "@/lib/utils"
+
+export const revalidate = 0
+export const dynamic = "force-dynamic"
 
 // SSG parameters
 export async function generateStaticParams() {
@@ -62,7 +66,7 @@ export default async function ProductPage(props: Props) {
       name: productFound.company?.company_name || "Unknown Company",
       logo: productFound.company?.company_logo_url || "/placeholder.svg",
     },
-    nutrients: productFound.nutrients,
+    nutrients: parseNutrients(productFound.nutrients),
   }
 
   return (

@@ -8,6 +8,7 @@ import { AlertCircle, Edit, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { parseNutrients } from "@/lib/utils"
 import { AddEditProductForm, type ProductFormData } from "@/components/company/add-edit-product-form"
 
 // --- Interface Definitions ---
@@ -180,7 +181,7 @@ export default function EditProductPage() {
             // Enforce 'cm' on edit load to match new standard
             dimensionUnit: "cm",
 
-            nutrients: productData.nutrients || [],
+            nutrients: parseNutrients(productData.nutrients),
             categories: productData.categories || [],
             existingProductPhotoUrls: existingProductPhotoUrls,
             existingProductVideoUrl: existingProductVideoUrl,

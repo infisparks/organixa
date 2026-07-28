@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { parseNutrients } from "@/lib/utils"
 
 // =========================================================================
 //                              HELPER FUNCTIONS
@@ -525,19 +526,23 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
               {activeTab === "description" ? (
                 <>
                   <div className="prose prose-sm max-w-none text-gray-700"><p>{product.productDescription}</p></div>
-                  {product.nutrients && product.nutrients.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Nutritional Information</h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {product.nutrients.map((nutrient) => (
-                          <div key={nutrient.name} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                            <div className="font-semibold text-gray-900 text-lg">{nutrient.value}</div>
-                            <div className="text-sm text-gray-600">{nutrient.name}</div>
-                          </div>
-                        ))}
+                  {(() => {
+                    const parsedNutrients = parseNutrients(product.nutrients)
+                    if (!parsedNutrients || parsedNutrients.length === 0) return null
+                    return (
+                      <div className="mt-8">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Nutritional Information</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          {parsedNutrients.map((nutrient, idx) => (
+                            <div key={(nutrient.name || "nutrient") + idx} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                              <div className="font-semibold text-gray-900 text-lg">{nutrient.value}</div>
+                              <div className="text-sm text-gray-600">{nutrient.name}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </>
               ) : (
                 <div className="space-y-6">

@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { AlertCircle, Plus, Upload, X, Loader2, Camera, Video, CheckCircle2, Eye } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
+import { cn, parseNutrients } from "@/lib/utils"
 
 const availableNutrients = ["Protein", "Fat", "Carbs", "Fiber", "Calcium", "Iron", "Vitamin C", "Vitamin D", "Custom"]
 
@@ -171,7 +171,7 @@ export function AddEditProductForm({
         width: initialProductData.width,
         height: initialProductData.height,
         dimensionUnit: "cm", // Enforce cm on edit
-        nutrients: initialProductData.nutrients,
+        nutrients: parseNutrients(initialProductData.nutrients),
         categories: initialProductData.categories,
       })
       setExistingImages(initialProductData.existingProductPhotoUrls || [])
@@ -358,6 +358,7 @@ export function AddEditProductForm({
     setNutrientValue("")
     if (selectedNutrient === "Custom") {
       setCustomNutrientName("")
+      setSelectedNutrient(availableNutrients[0])
     }
     setError("")
   }
@@ -383,6 +384,17 @@ export function AddEditProductForm({
       return
     }
     setError("") // Clear previous errors
+
+    // Auto-append any pending nutrient entered in the inputs if user didn't click "+ Add"
+    const pendingNutrientName = selectedNutrient === "Custom" ? customNutrientName.trim() : selectedNutrient.trim()
+    if (pendingNutrientName && nutrientValue.trim()) {
+      if (!data.nutrients) {
+        data.nutrients = []
+      }
+      if (!data.nutrients.some((n) => n.name.toLowerCase() === pendingNutrientName.toLowerCase())) {
+        data.nutrients.push({ name: pendingNutrientName, value: nutrientValue.trim() })
+      }
+    }
 
     data.existingProductVideoUrl = existingVideoUrl
     data.existingProductPhotoUrls = existingImages
